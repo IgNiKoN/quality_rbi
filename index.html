@@ -4,8 +4,19 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <!-- ПОДСКАЗКА: для правки заголовка страницы измените текст здесь -->
-    <title>RBI QUALITY AUDIT v.12.0</title>
-    
+    <title>RBI QUALITY AUDIT v.15.0</title>
+
+    <link rel="manifest" href="/quality_rbi/manifest.webmanifest">
+<meta name="theme-color" content="#4f46e5">
+
+<link rel="apple-touch-icon" href="/quality_rbi/icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="/quality_rbi/icons/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/quality_rbi/icons/favicon-16x16.png">
+<link rel="shortcut icon" href="/quality_rbi/favicon.ico">
+
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="RBI Quality">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
@@ -265,10 +276,10 @@
                     <div id="data-toggle-icon" class="text-slate-400 text-[8px] font-bold bg-white px-1.5 py-0.5 rounded border border-slate-200 shadow-sm transition-transform shrink-0">СВЕРНУТЬ ▲</div>
                 </div>
                 <div id="data-block-content" class="grid grid-cols-2 gap-1 mt-1.5 transition-all">
-                    <input type="text" id="inp-project" class="input-base !py-1 !px-2 !text-[10px]" placeholder="Объект" oninput="saveSessionData(); updateDataSummary();">
-                    <input type="text" id="inp-inspector" class="input-base !py-1 !px-2 !text-[10px]" placeholder="Проверяющий" oninput="saveSessionData(); updateDataSummary();">
-                    <input type="text" id="inp-contractor" class="input-base !py-1 !px-2 !text-[10px]" placeholder="Подрядчик" oninput="saveSessionData(); updateDataSummary();">
-                    <input type="text" id="inp-location" class="input-base !py-1 !px-2 !text-[10px] transition-colors duration-300" placeholder="Ось, Этаж, Пом. *" oninput="saveSessionData(); updateDataSummary();">
+                    <input type="text" id="inp-project" class="input-base !py-1 !px-2 !text-[10px]" placeholder="Объект" oninput="scheduleSessionSave(); updateDataSummary();">
+                    <input type="text" id="inp-inspector" class="input-base !py-1 !px-2 !text-[10px]" placeholder="Проверяющий" oninput="scheduleSessionSave(); updateDataSummary();">
+                    <input type="text" id="inp-contractor" class="input-base !py-1 !px-2 !text-[10px]" placeholder="Подрядчик" oninput="scheduleSessionSave(); updateDataSummary();">
+                    <input type="text" id="inp-location" class="input-base !py-1 !px-2 !text-[10px] transition-colors duration-300" placeholder="Ось, Этаж, Пом. *" oninput="scheduleSessionSave(); updateDataSummary();">
                 </div>
                 <div id="data-block-summary" class="hidden" onclick="toggleDataBlock()"></div>
             </div>
@@ -440,7 +451,98 @@
 
 <script>
         const METHODOLOGY_VERSION = "12.0.0";
+// === STAGE 1 SAFE MIGRATION: IndexedDB storage instead of localStorage ===
+// Важно: не меняем структуру state/details/photos/contractorArray.
+// Меняем только место хранения, чтобы не ломать UI, PDF и аналитику.
 
+const APP_DB_NAME = 'RBI_QUALITY_DB';
+const APP_DB_VERSION = 1;
+const APP_STORE_NAME = 'app_state';
+
+function openAppDb() {
+    return new Promise((resolve, reject) => {
+        const request = indexedDB.open(APP_DB_NAME, APP_DB_VERSION);
+
+        request.onupgradeneeded = function(event) {
+            const db = event.target.result;
+            if (!db.objectStoreNames.contains(APP_STORE_NAME)) {
+                db.createObjectStore(APP_STORE_NAME, { keyPath: 'key' });
+            }
+        };
+
+        request.onsuccess = function() {
+            resolve(request.result);
+        };
+
+        request.onerror = function() {
+            reject(request.error);
+        };
+    });
+}
+
+async function idbSet(key, value) {
+    const db = await openAppDb();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(APP_STORE_NAME, 'readwrite');
+        const store = tx.objectStore(APP_STORE_NAME);
+        store.put({ key, value });
+
+        tx.oncomplete = () => resolve(true);
+        tx.onerror = () => reject(tx.error);
+        tx.onabort = () => reject(tx.error);
+    });
+}
+
+async function idbGet(key) {
+    const db = await openAppDb();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(APP_STORE_NAME, 'readonly');
+        const store = tx.objectStore(APP_STORE_NAME);
+        const req = store.get(key);
+
+        req.onsuccess = () => resolve(req.result ? req.result.value : null);
+        req.onerror = () => reject(req.error);
+    });
+}
+
+async function idbDelete(key) {
+    const db = await openAppDb();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(APP_STORE_NAME, 'readwrite');
+        const store = tx.objectStore(APP_STORE_NAME);
+        store.delete(key);
+
+        tx.oncomplete = () => resolve(true);
+        tx.onerror = () => reject(tx.error);
+        tx.onabort = () => reject(tx.error);
+    });
+}
+
+async function idbClearAll() {
+    const db = await openAppDb();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(APP_STORE_NAME, 'readwrite');
+        const store = tx.objectStore(APP_STORE_NAME);
+        store.clear();
+
+        tx.oncomplete = () => resolve(true);
+        tx.onerror = () => reject(tx.error);
+        tx.onabort = () => reject(tx.error);
+    });
+}
+
+// Ключ для хранения всей сессии приложения
+const IDB_SESSION_KEY = 'session_snapshot';
+
+// Чтобы не долбить IndexedDB слишком часто при наборе текста
+let __saveSessionTimer = null;
+
+function scheduleSessionSave() {
+    clearTimeout(__saveSessionTimer);
+    __saveSessionTimer = setTimeout(() => {
+        saveSessionData();
+    }, 150);
+}
         function formatNorms(text) {
             if(!text) return "";
             let html = text.replace(/(СП\s?\d+(\.\d+)*(\.\d+)?|ГОСТ\s?(Р\s)?\d+(-\d+)?|Проект|Тех\.\s?карта|Техническое\s?задание)/g, '<span class="norm-ref">$1</span>');
@@ -1881,25 +1983,24 @@ const SYSTEM_TEMPLATES = {
         }
 
 // --- ИНИЦИАЛИЗАЦИЯ И ИНТЕРФЕЙС ---
-        document.addEventListener("DOMContentLoaded", () => {
-            try {
-                userTemplates = JSON.parse(localStorage.getItem(USER_TEMPLATES_KEY) || '{}');
-                init();
-                
-                // Динамический расчет высоты шапки, чтобы она никогда не перекрывала контент
-                const header = document.getElementById('main-header');
-                const navContainer = document.getElementById('mini-progress-nav');
-                const resizeObserver = new ResizeObserver(() => {
-                    const h = header.offsetHeight;
-                    document.body.style.paddingTop = `${h + 10}px`;
-                    if (navContainer) navContainer.style.top = `${h}px`; // Навигация прилипает ровно под шапку
-                });
-                if (header) resizeObserver.observe(header);
+        document.addEventListener("DOMContentLoaded", async () => {
+    try {
+        userTemplates = JSON.parse(localStorage.getItem(USER_TEMPLATES_KEY) || '{}');
+        await init();
 
-            } catch (error) {
-                console.error("Ошибка при загрузке:", error);
-            }
+        const header = document.getElementById('main-header');
+        const navContainer = document.getElementById('mini-progress-nav');
+        const resizeObserver = new ResizeObserver(() => {
+            const h = header.offsetHeight;
+            document.body.style.paddingTop = `${h + 10}px`;
+            if (navContainer) navContainer.style.top = `${h}px`;
         });
+        if (header) resizeObserver.observe(header);
+
+    } catch (error) {
+        console.error("Ошибка при загрузке:", error);
+    }
+});
 
         // Точный математический скролл к названию группы
         function scrollToGroup(index) {
@@ -1932,9 +2033,9 @@ const SYSTEM_TEMPLATES = {
             else if (tabId === 'tab-rating') { updateRatingFilters(); renderRatingTab(); }
         }
 
-        function init() {
-            renderSelector();
-            restoreSession();
+        async function init() {
+    renderSelector();
+    await restoreSession();
             // Change 1: Логика пустого состояния
             if(!currentTemplateKey) {
                 document.getElementById('empty-checklist-state').style.display = 'block';
@@ -2502,44 +2603,86 @@ function saveProductToArray() {
             state = {}; details = {}; photos = {}; document.getElementById('inp-location').value = ''; saveSessionData(); render(); updateUI();
         }
 
-        function resetAll() {
-            if(!confirm('Очистить вообще всё? Вся база, все подрядчики и текущий чек-лист будут удалены безвозвратно!')) return;
-            localStorage.removeItem(SESSION_KEY); localStorage.clear(); location.reload(); 
-        }
+        async function resetAll() {
+    if(!confirm('Очистить вообще всё? Вся база, все подрядчики и текущий чек-лист будут удалены безвозвратно!')) return;
+
+    try {
+        await idbClearAll();
+        localStorage.clear();
+        location.reload();
+    } catch (e) {
+        console.error('Ошибка полного сброса:', e);
+        alert('Не удалось полностью очистить IndexedDB.');
+    }
+}
 
         function clearHistory() {
             if(!confirm('Удалить всю историю массива? Текущий чек-лист останется.')) return;
             contractorArray = []; saveSessionData(); renderHistoryTab(); updateUI();
         }
 
-        function saveSessionData() {
-            try {
-                localStorage.setItem(SESSION_KEY, JSON.stringify({
-                    templateKey: currentTemplateKey, project: document.getElementById('inp-project').value,
-                    inspector: document.getElementById('inp-inspector').value, contractor: document.getElementById('inp-contractor').value,
-                    location: document.getElementById('inp-location').value, state, details, photos, contractorArray
-                }));
-            } catch (e) { alert("Память переполнена фотографиями. Сделайте экспорт PDF и удалите часть истории."); }
+        async function saveSessionData() {
+    try {
+        await idbSet(IDB_SESSION_KEY, {
+            templateKey: currentTemplateKey,
+            project: document.getElementById('inp-project').value,
+            inspector: document.getElementById('inp-inspector').value,
+            contractor: document.getElementById('inp-contractor').value,
+            location: document.getElementById('inp-location').value,
+            state,
+            details,
+            photos,
+            contractorArray
+        });
+    } catch (e) {
+        console.error('Ошибка сохранения в IndexedDB:', e);
+        alert("Ошибка сохранения данных в IndexedDB. Проверьте режим браузера и доступное место.");
+    }
+}
+
+        async function restoreSession() {
+    try {
+        const data = await idbGet(IDB_SESSION_KEY);
+        if (!data) return;
+
+        if (data.templateKey) {
+            currentTemplateKey = data.templateKey;
         }
 
-        function restoreSession() {
-            const raw = localStorage.getItem(SESSION_KEY); if (!raw) return;
-            try {
-                const data = JSON.parse(raw);
-                if (data.templateKey) { currentTemplateKey = data.templateKey; }
-                const type = currentTemplateKey.split('_')[0]; const key = currentTemplateKey.replace(type + '_', '');
-                if (type === 'sys' && SYSTEM_TEMPLATES[key]) currentChecklist = SYSTEM_TEMPLATES[key].groups;
-                else if (type === 'user' && userTemplates[key]) currentChecklist = userTemplates[key].groups;
-                
-                state = data.state || {}; details = data.details || {}; photos = data.photos || {}; contractorArray = data.contractorArray || [];
-                if(currentTemplateKey) document.getElementById('checklist-selector').value = currentTemplateKey;
-                document.getElementById('inp-project').value = data.project || '';
-                document.getElementById('inp-inspector').value = data.inspector || '';
-                document.getElementById('inp-contractor').value = data.contractor || '';
-                document.getElementById('inp-location').value = data.location || '';
-                updateDataSummary();
-            } catch (e) { state = {}; details = {}; photos = {}; contractorArray = []; }
+        if (currentTemplateKey) {
+            const type = currentTemplateKey.split('_')[0];
+            const key = currentTemplateKey.replace(type + '_', '');
+
+            if (type === 'sys' && SYSTEM_TEMPLATES[key]) {
+                currentChecklist = SYSTEM_TEMPLATES[key].groups;
+            } else if (type === 'user' && userTemplates[key]) {
+                currentChecklist = userTemplates[key].groups;
+            }
         }
+
+        state = data.state || {};
+        details = data.details || {};
+        photos = data.photos || {};
+        contractorArray = data.contractorArray || [];
+
+        if (currentTemplateKey) {
+            document.getElementById('checklist-selector').value = currentTemplateKey;
+        }
+
+        document.getElementById('inp-project').value = data.project || '';
+        document.getElementById('inp-inspector').value = data.inspector || '';
+        document.getElementById('inp-contractor').value = data.contractor || '';
+        document.getElementById('inp-location').value = data.location || '';
+
+        updateDataSummary();
+    } catch (e) {
+        console.error('Ошибка восстановления из IndexedDB:', e);
+        state = {};
+        details = {};
+        photos = {};
+        contractorArray = [];
+    }
+}
 
         // --- ИСТОРИЯ ---
 
@@ -3401,18 +3544,176 @@ function saveProductToArray() {
 
             // ПОДСКАЗКА: для правки текста в разделе "Справка" измените текст здесь для каждого раздела
             if (type === 'contractor') {
-                title.innerText = "Аналитика (Enterprise)";
+                title.innerText = "Краткая инфо-справка об УрК";
                 body.innerHTML = `
-                <div class="space-y-4">
-                    <div class="bg-slate-50 p-3 rounded-xl border border-slate-200">
-                        <p class="mb-2"><b>Волатильность (σ):</b> Показывает разброс качества (стандартное отклонение) от проверки к проверке. Чем выше значение, тем нестабильнее работает подрядчик.</p>
-                        <p><b>Индекс стабильности (0-100):</b> Показывает, насколько подрядчик "ровно" и предсказуемо выполняет работы. Рассчитывается как: <br><code class="bg-white px-1 py-0.5 rounded text-xs border border-slate-200 mt-1 inline-block">100 - Волатильность - (Доля B3 × 0.5)</code>.<br>Идеальное значение: от 85 до 100.</p>
-                    </div>
-                    <div class="bg-slate-50 p-3 rounded-xl border border-slate-200">
-                        <p class="mb-2"><b>Системность (Ks):</b> Анализирует повторяемость одинаковых дефектов <b>только B2 и B3</b>. Если один и тот же дефект повторяется у подрядчика от изделия к изделию — это системный брак, снижающий его рейтинг (вплоть до умножения на 0.75).</p>
-                        <p><b>Правило потолка 84%:</b> Если доля изделий с B3 более 10%, либо повторяемость одного значимого дефекта выше 35% — рейтинг подрядчика не может быть выше 84%.</p>
-                    </div>
-                </div>`;
+                <div class="space-y-3 text-sm leading-6">
+
+    <!-- Что считает система -->
+    <div class="rounded-2xl border border-sky-200 bg-sky-50 p-4">
+        <div class="flex items-center gap-2 mb-2">
+            <div class="h-2.5 w-2.5 rounded-full bg-sky-500"></div>
+            <p class="font-semibold text-sky-900">Что считает система</p>
+        </div>
+        <div class="space-y-2 text-sky-900">
+            <p><b>УрК изделия</b> — качество конкретного окна, двери, помещения, узла или участка работ.</p>
+            <p><b>УрК подрядчика</b> — качество подрядчика по массиву однотипных проверок.</p>
+            <p class="text-sky-800"><b>Чем выше процент, тем выше качество.</b></p>
+        </div>
+    </div>
+
+    <!-- Категории дефектов -->
+    <div class="rounded-2xl border border-violet-200 bg-violet-50 p-4">
+        <div class="flex items-center gap-2 mb-2">
+            <div class="h-2.5 w-2.5 rounded-full bg-violet-500"></div>
+            <p class="font-semibold text-violet-900">Категории дефектов</p>
+        </div>
+        <div class="grid grid-cols-1 gap-2">
+            <div class="rounded-xl border border-violet-100 bg-white/80 p-3 text-violet-900">
+                <b>B1</b> — незначительный дефект
+            </div>
+            <div class="rounded-xl border border-violet-100 bg-white/80 p-3 text-violet-900">
+                <b>B2</b> — значительный дефект
+            </div>
+            <div class="rounded-xl border border-violet-100 bg-white/80 p-3 text-violet-900">
+                <b>B3</b> — критический дефект
+            </div>
+        </div>
+        <div class="mt-3 rounded-xl border border-violet-200 bg-white/80 p-3 text-violet-800">
+            <p class="font-medium mb-1">Правило 1.5</p>
+            <p>Если дефект относится к <b>B2</b>, но отклонение превышает допустимое более чем в <b>1.5 раза</b>, он переводится в <b>B3</b>.</p>
+        </div>
+    </div>
+
+    <!-- УрК изделия -->
+    <div class="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+        <div class="flex items-center gap-2 mb-2">
+            <div class="h-2.5 w-2.5 rounded-full bg-emerald-500"></div>
+            <p class="font-semibold text-emerald-900">УрК изделия</p>
+        </div>
+        <div class="space-y-3 text-emerald-900">
+            <p>Сначала считается базовый процент качества по проверенным пунктам, затем применяются штрафы за концентрацию значимых дефектов и за критичность.</p>
+            <code class="inline-block rounded-lg border border-emerald-200 bg-white px-2 py-1 text-xs">УрК изделия = Базовый УрК × Kc × Kcrit изделия</code>
+            <div class="space-y-1 text-emerald-800">
+                <p><b>Kc</b> — концентрация дефектов <b>B2</b> в одном изделии.</p>
+                <p><b>Kcrit изделия</b> — наличие <b>B3</b>.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Правила по изделию -->
+    <div class="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+        <div class="flex items-center gap-2 mb-2">
+            <div class="h-2.5 w-2.5 rounded-full bg-amber-500"></div>
+            <p class="font-semibold text-amber-900">Ключевые правила по изделию</p>
+        </div>
+        <div class="space-y-2">
+            <div class="rounded-xl border border-amber-200 bg-white/80 p-3 text-amber-900">
+                Если есть хотя бы один <b>B2</b>, итог <b>не может быть выше 84%</b>.
+            </div>
+            <div class="rounded-xl border border-amber-200 bg-white/80 p-3 text-amber-900">
+                Если <b>Kc &lt; 1</b> или <b>Kcrit изделия &lt; 1</b>, итог тоже <b>не выше 84%</b>.
+            </div>
+            <div class="rounded-xl border border-amber-200 bg-white/80 p-3 text-amber-900">
+                Если есть <b>B3</b>, изделие считается <b>непринятым до устранения</b>.
+            </div>
+        </div>
+    </div>
+
+    <!-- Зоны изделия -->
+    <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+        <p class="font-semibold text-slate-900 mb-3">Зоны УрК изделия</p>
+        <div class="space-y-2">
+            <div class="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2">
+                <p class="font-bold text-emerald-900">100%</p>
+                <p class="text-xs text-emerald-800">идеально</p>
+            </div>
+            <div class="rounded-xl border border-sky-200 bg-sky-50 px-3 py-2">
+                <p class="font-bold text-sky-900">85–99%</p>
+                <p class="text-xs text-sky-800">принято</p>
+            </div>
+            <div class="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2">
+                <p class="font-bold text-amber-900">70–84%</p>
+                <p class="text-xs text-amber-800">исправить</p>
+            </div>
+            <div class="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2">
+                <p class="font-bold text-rose-900">&lt; 70%</p>
+                <p class="text-xs text-rose-800">брак / не принято</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- УрК подрядчика -->
+    <div class="rounded-2xl border border-indigo-200 bg-indigo-50 p-4">
+        <div class="flex items-center gap-2 mb-2">
+            <div class="h-2.5 w-2.5 rounded-full bg-indigo-500"></div>
+            <p class="font-semibold text-indigo-900">УрК подрядчика</p>
+        </div>
+        <div class="space-y-3 text-indigo-900">
+            <p>Берется массив однотипных проверок одного подрядчика. Базовый процент снижается за повторяемость одного и того же дефекта и за долю изделий с критическими нарушениями.</p>
+            <code class="inline-block rounded-lg border border-indigo-200 bg-white px-2 py-1 text-xs">УрК подрядчика = Базовый УрК × Ks × Kcrit подрядчика</code>
+            <div class="space-y-1 text-indigo-800">
+                <p><b>Ks</b> — повторяемость одного и того же дефекта.</p>
+                <p><b>Kcrit подрядчика</b> — доля изделий с <b>B3</b>.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Правила по подрядчику -->
+    <div class="rounded-2xl border border-rose-200 bg-rose-50 p-4">
+        <div class="flex items-center gap-2 mb-2">
+            <div class="h-2.5 w-2.5 rounded-full bg-rose-500"></div>
+            <p class="font-semibold text-rose-900">Ключевые правила по подрядчику</p>
+        </div>
+        <div class="space-y-2">
+            <div class="rounded-xl border border-rose-200 bg-white/80 p-3 text-rose-900">
+                Если <b>Ks &lt; 1</b> или <b>Kcrit подрядчика &lt; 1</b>, итог <b>не может быть выше 84%</b>.
+            </div>
+            <div class="rounded-xl border border-rose-200 bg-white/80 p-3 text-rose-900">
+                Если повторяемость одного дефекта достигла <b>50%</b> и более, это <b>системный брак</b>.
+            </div>
+            <div class="rounded-xl border border-rose-200 bg-white/80 p-3 text-rose-900">
+                Если в массиве <b>3 и более изделий с B3</b> или доля изделий с <b>B3 ≥ 30%</b>, подрядчик попадает в <b>красную зону</b>.
+            </div>
+        </div>
+    </div>
+
+    <!-- Зоны подрядчика -->
+    <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+        <p class="font-semibold text-slate-900 mb-3">Зоны УрК подрядчика</p>
+        <div class="space-y-2">
+            <div class="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2">
+                <p class="font-bold text-emerald-900">100%</p>
+                <p class="text-xs text-emerald-800">образцовое качество</p>
+            </div>
+            <div class="rounded-xl border border-sky-200 bg-sky-50 px-3 py-2">
+                <p class="font-bold text-sky-900">85–99%</p>
+                <p class="text-xs text-sky-800">приемлемо</p>
+            </div>
+            <div class="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2">
+                <p class="font-bold text-amber-900">70–84%</p>
+                <p class="text-xs text-amber-800">нужны исправления</p>
+            </div>
+            <div class="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2">
+                <p class="font-bold text-rose-900">&lt; 70%</p>
+                <p class="text-xs text-rose-800">неудовлетворительно</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Смысл -->
+    <div class="rounded-2xl border border-cyan-200 bg-cyan-50 p-4">
+        <div class="flex items-center gap-2 mb-2">
+            <div class="h-2.5 w-2.5 rounded-full bg-cyan-500"></div>
+            <p class="font-semibold text-cyan-900">Главный смысл</p>
+        </div>
+        <div class="space-y-2 text-cyan-900">
+            <p>Система показывает не только <b>общий процент качества</b>.</p>
+            <p>Она учитывает <b>серьезность дефектов</b>, <b>их концентрацию в изделии</b>, <b>повторяемость у подрядчика</b> и <b>наличие критических нарушений</b>.</p>
+            <p class="text-cyan-800">Это помогает принимать решения по <b>приемке, контролю и рискам</b> по единым правилам.</p>
+        </div>
+    </div>
+
+</div>`;
             } else if (type === 'status') {
                 title.innerText = "Статусы и цвета";
                 body.innerHTML = `
@@ -3461,5 +3762,18 @@ function saveProductToArray() {
             document.body.classList.remove('modal-open');
         }
     </script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/quality_rbi/sw.js')
+      .then((reg) => {
+        console.log('Service Worker registered:', reg.scope);
+      })
+      .catch((err) => {
+        console.error('Service Worker registration failed:', err);
+      });
+  });
+}
+</script>
 </body>
 </html>
