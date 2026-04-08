@@ -2457,37 +2457,34 @@ const SYSTEM_TEMPLATES = {
             details[id] = details[id] || {};
             details[id].showComment = !details[id].showComment;
             
-            // Фиксируем позицию конкретной карточки на экране
-            const card = document.getElementById('item_' + id);
-            const offset = card ? card.getBoundingClientRect().top : 0;
-            
             render();
             
-            // Возвращаем прокрутку точно к этой карточке
+            // Плавно центрируем карточку на экране
+            const card = document.getElementById('item_' + id);
             if (card) {
-                const newCard = document.getElementById('item_' + id);
-                if (newCard) window.scrollTo(0, newCard.getBoundingClientRect().top + window.scrollY - offset);
+                card.scrollIntoView({ behavior: 'smooth', block: 'center' });
             }
             
             if(details[id].showComment) {
-                setTimeout(() => { const el = document.getElementById(`comment_${id}`); if(el) el.focus(); }, 50);
+                setTimeout(() => { const el = document.getElementById(`comment_${id}`); if(el) el.focus(); }, 100);
             }
         }
 
         function closeCommentField(id) {
             details[id] = details[id] || {};
             const inputEl = document.getElementById(`comment_${id}`);
-            if (inputEl) details[id].comment = inputEl.value.trim();
+            if (inputEl) {
+                details[id].comment = inputEl.value.trim();
+                inputEl.blur(); // Принудительно скрываем клавиатуру телефона
+            }
             details[id].showComment = false;
-            
-            const card = document.getElementById('item_' + id);
-            const offset = card ? card.getBoundingClientRect().top : 0;
             
             render();
             
+            // После закрытия поля плавно возвращаем карточку в центр экрана
+            const card = document.getElementById('item_' + id);
             if (card) {
-                const newCard = document.getElementById('item_' + id);
-                if (newCard) window.scrollTo(0, newCard.getBoundingClientRect().top + window.scrollY - offset);
+                card.scrollIntoView({ behavior: 'smooth', block: 'center' });
             }
             saveSessionData();
         }
@@ -2497,14 +2494,11 @@ const SYSTEM_TEMPLATES = {
             if(!confirm('Удалить комментарий?')) return;
             if(details[id]) { details[id].comment = ""; details[id].showComment = false; }
             
-            const card = document.getElementById('item_' + id);
-            const offset = card ? card.getBoundingClientRect().top : 0;
-            
             render(); 
             
+            const card = document.getElementById('item_' + id);
             if (card) {
-                const newCard = document.getElementById('item_' + id);
-                if (newCard) window.scrollTo(0, newCard.getBoundingClientRect().top + window.scrollY - offset);
+                card.scrollIntoView({ behavior: 'smooth', block: 'center' });
             }
             saveSessionData();
         }
