@@ -318,7 +318,7 @@
     <header class="header-fixed" id="main-header">
         <!-- Плашка демо-режима -->
         <div id="demo-banner">
-            <span>⚠️ ДЕМО-РЕЖИМ | Данные не сохраняются, расчеты фэйковые</span>
+            <span>⚠️ ДЕМО-РЕЖИМ | Расчеты фэйковые</span>
             <button onclick="exitDemoMode()" class="bg-white text-red-600 px-3 py-1 rounded-md text-[9px] font-black active:scale-95 shadow-sm">ВЫЙТИ ИЗ ДЕМО ✕</button>
         </div>
         <div class="max-w-4xl mx-auto px-3 py-2">
@@ -352,7 +352,6 @@
                     <!-- Кнопка Быстро -->
                     <div class="flex items-center gap-1 bg-slate-100 px-2 py-1.5 rounded-md border border-slate-200 cursor-pointer active:scale-95 transition-transform" onclick="toggleFastMode()" id="fast-mode-btn">
                         <span class="text-[9px] font-bold text-slate-500">⚡</span>
-                        <span onclick="event.stopPropagation(); alert('Быстрый режим: скрывает тексты нормативов из чек-листа, оставляя только суть. Полезно для опытных инженеров.')" class="demo-hint hidden"></span>
                         <div class="w-5 h-2.5 bg-slate-300 rounded-full relative" id="fast-mode-toggle">
                             <div class="w-2.5 h-2.5 bg-white rounded-full absolute left-0 shadow-sm transition-all" id="fast-mode-knob"></div>
                         </div>
@@ -510,7 +509,7 @@
                         <button onclick="startDemoMode()" class="w-full bg-gradient-to-r from-sky-500 to-indigo-500 text-white py-3 rounded-xl font-black text-xs uppercase tracking-widest hover:opacity-90 transition-all shadow-md active:scale-95 flex justify-center items-center gap-2">
                             🎮 Запустить Демо-режим
                         </button>
-                        <div class="text-[11px] text-slate-400 leading-tight mt-1">Для новичков. Приложение заполнится тестовыми данными (рейтинги, фото). Появятся подсказки. Все основные кнопки будут работать</div>
+                        <div class="text-[11px] text-slate-400 leading-tight mt-1">Для новичков. Приложение заполнится тестовыми данными (рейтинги, фото). Появятся подсказки. Все основные функции будут работать</div>
                     </div>
                     
                     <!-- Кнопка РЕАЛЬНАЯ РАБОТА (Хитрая) -->
