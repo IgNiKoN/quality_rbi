@@ -2481,11 +2481,6 @@ const SYSTEM_TEMPLATES = {
             
             render();
             
-            // После закрытия поля плавно возвращаем карточку в центр экрана
-            const card = document.getElementById('item_' + id);
-            if (card) {
-                card.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }
             saveSessionData();
         }
 
