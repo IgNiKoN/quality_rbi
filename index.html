@@ -231,102 +231,6 @@
         body.demo-mode #demo-banner {
             display: flex;
         }
-        /* ======================================== */
-/* АДАПТИВНАЯ АНАЛИТИКА И РЕЙТИНГ */
-/* ======================================== */
-
-/* 1. Сводный дашборд (3 карточки) — автоматически перестраиваются */
-.dashboard-stats {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
-    gap: 10px;
-    margin-bottom: 20px;
-}
-
-/* 2. Графики — сохраняют пропорции и не ломаются */
-.chart-container {
-    aspect-ratio: 16 / 9;
-    height: auto;
-    min-height: 180px;
-    width: 100%;
-}
-
-/* 3. Таблицы — горизонтальный скролл на телефонах */
-.history-table,
-.photo-table,
-.metrics-table,
-.rating-table {
-    display: block;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    width: 100%;
-}
-
-/* 4. Карточки подрядчиков в аналитике */
-.analytics-card .flex.items-end.justify-between {
-    flex-wrap: wrap;
-    gap: 12px;
-}
-
-/* 5. Проценты УрК — масштабируются */
-.analytics-card .text-4xl,
-.rating-card .text-3xl {
-    font-size: clamp(24px, 7vw, 36px);
-}
-
-/* 6. Базовые адаптивные правки для телефонов */
-@media (max-width: 500px) {
-    /* Уменьшаем отступы */
-    .p-4 {
-        padding: 12px !important;
-    }
-    
-    /* Текст поменьше */
-    .text-sm {
-        font-size: 11px !important;
-    }
-    
-    /* Заголовки меньше */
-    .text-xs.uppercase {
-        font-size: 9px !important;
-    }
-    
-    /* Карточки рейтинга */
-    .rating-card {
-        padding: 12px !important;
-    }
-    
-    /* Блок с фильтрами */
-    .grid-cols-1.min-\[400px\]\:grid-cols-2 {
-        gap: 8px !important;
-    }
-}
-
-/* 7. Для очень узких экранов (iPhone 5s, Redmi) */
-@media (max-width: 380px) {
-    /* 3 карточки дашборда в колонку */
-    .dashboard-stats {
-        grid-template-columns: 1fr !important;
-    }
-    
-    /* УрК подрядчика в аналитике — в столбец */
-    .analytics-card .flex.items-end.justify-between {
-        flex-direction: column !important;
-        align-items: flex-start !important;
-    }
-    
-    /* Текст "База: ..." выравниваем влево */
-    .analytics-card .text-right.text-\[10px\] {
-        text-align: left !important;
-    }
-    
-    /* Таблицы — ещё мельче шрифт */
-    .history-table td,
-    .history-table th {
-        font-size: 9px !important;
-        padding: 4px !important;
-    }
-}
     </style>
 </head>
 <body id="app-body" class="text-slate-900">
@@ -2577,6 +2481,11 @@ const SYSTEM_TEMPLATES = {
             
             render();
             
+            // После закрытия поля плавно возвращаем карточку в центр экрана
+            const card = document.getElementById('item_' + id);
+            if (card) {
+                card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
             saveSessionData();
         }
 
@@ -3348,13 +3257,13 @@ if (isDemoMode) { showToast('⚠️ В демо-режиме сохранени�
             const tData = Object.keys(templateMap).map(k => Math.round(templateMap[k].sum / templateMap[k].count));
 
             html += `
-            <div class="mb-8 bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm analytics-card">
+            <div class="mb-8 bg-white border border-slate-200 rounded-xl overflow-hidden shadow-md">
                 <div class="bg-slate-800 text-white p-3 font-black text-sm uppercase tracking-wider flex justify-between items-center">
                     <span>📊 Сводный Дашборд Объекта</span>
                     <span class="text-[10px] font-bold text-slate-300 bg-slate-700 px-2 py-1 rounded">Выборка: ${baseArray.length}</span>
                 </div>
                 <div class="p-4 bg-slate-50">
-                    <div class="dashboard-stats">
+                    <div class="grid grid-cols-3 gap-2 mb-5 text-center">
                         <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
                             <div class="text-[9px] text-slate-400 uppercase font-bold mb-1 leading-tight">Средний УрК</div>
                             <div class="text-3xl min-[380px]:text-4xl font-black ${avgColor} leading-none tracking-tighter">${avgUrk}%</div>
@@ -3661,7 +3570,7 @@ if (isDemoMode) { showToast('⚠️ В демо-режиме сохранени�
                     </div>
                 </div>
             </div>`;
-           
+            // --- КОНЕЦ ВСТАВКИ ---
 
             const uniqueContractors = [...new Set(baseArray.map(i => i.contractorName))];
             let globalBlockIndex = 0;
@@ -3798,7 +3707,6 @@ if (isDemoMode) { showToast('⚠️ В демо-режиме сохранени�
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>${reportTitle}</title>
     <style>
-        
         @page { size: auto; margin: 12mm 10mm; }
         body {
             font-family: 'Inter', -apple-system, sans-serif;
@@ -4024,95 +3932,6 @@ if (isDemoMode) { showToast('⚠️ В демо-режиме сохранени�
 
         .mt-20 { margin-top: 20px; }
         .mt-30 { margin-top: 30px; }
-        /* ===== АДАПТИВ ДЛЯ PDF (работает при печати) ===== */
-    
-    /* Сводный дашборд — 3 карточки */
-    .dashboard-stats {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
-        gap: 10px;
-        margin-bottom: 20px;
-    }
-    
-    /* Таблицы — не ломаются */
-    .history-table,
-    .photo-table,
-    .metrics-table {
-        overflow-x: auto;
-        width: 100%;
-    }
-    
-    /* Для маленьких страниц (A4, Letter) */
-    @media print {
-        body {
-            margin: 0;
-            padding: 10px;
-        }
-        
-        /* Карточки не разрываются */
-        .avoid-break {
-            page-break-inside: avoid;
-            break-inside: avoid;
-        }
-        
-        /* Графики не съезжают */
-        .chart-img {
-            max-width: 100%;
-            height: auto;
-        }
-        
-        /* Таблицы помещаются на страницу */
-        .history-table {
-            font-size: 9px;
-        }
-        
-        .history-table td,
-        .history-table th {
-            padding: 4px;
-        }
-    }
-    
-    /* Для экранов (предпросмотр) */
-    @media (max-width: 600px) {
-        .dashboard-stats {
-            grid-template-columns: 1fr !important;
-        }
-        
-        .split-view {
-            display: block !important;
-        }
-        
-        .split-col {
-            display: block !important;
-            width: 100% !important;
-            margin-bottom: 15px;
-        }
-        
-        .metrics-table td {
-            display: block;
-            text-align: left;
-            padding: 8px;
-        }
-    }
-        /* Адаптив для таблицы дашборда в PDF */
-@media (max-width: 600px) {
-    .metrics-table td {
-        display: block !important;
-        width: 100% !important;
-        text-align: left !important;
-        margin-bottom: 10px;
-    }
-    
-    .split-view {
-        display: block !important;
-    }
-    
-    .split-col {
-        display: block !important;
-        width: 100% !important;
-        margin-bottom: 20px;
-      }
-}    
     </style>
 </head>
 <body>
