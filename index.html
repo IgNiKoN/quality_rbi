@@ -204,7 +204,27 @@
         body.demo-mode {
             background-color: #e0f2fe; /* Легкий голубоватый оттенок */
         }
-        body.demo-mode .demo-hint { display: inline-block; }
+        /* Яркие пульсирующие подсказки в демо-режиме */
+        body.demo-mode .demo-hint { 
+            display: inline-flex !important; 
+            align-items: center; 
+            justify-content: center; 
+            background: #fde047 !important; 
+            color: #854d0e !important; 
+            border: 1px solid #eab308 !important; 
+            border-radius: 12px; 
+            padding: 2px 6px !important; 
+            font-size: 9px !important; 
+            font-weight: 900 !important; 
+            margin-left: 4px;
+            box-shadow: 0 2px 4px rgba(234, 179, 8, 0.4);
+            animation: pulseHint 1.5s infinite;
+        }
+        @keyframes pulseHint {
+            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(234, 179, 8, 0.7); }
+            70% { transform: scale(1.1); box-shadow: 0 0 0 5px rgba(234, 179, 8, 0); }
+            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(234, 179, 8, 0); }
+        }
         body.demo-mode .header-fixed {
             background: #f0f9ff;
             border-bottom: 2px solid #38bdf8;
@@ -259,6 +279,26 @@
 
     <!-- Контейнер для Тостов (Change 3) -->
     <div id="toast-container"></div>
+    <!-- НОВОЕ Окно для редактирования экспертного заключения -->
+    <div id="expert-modal-overlay" class="fixed inset-0 bg-slate-900/70 z-[160] hidden items-end min-[640px]:items-center justify-center p-0 min-[640px]:p-4 backdrop-blur-sm transition-opacity" onclick="cancelExpertEdit()">
+        <div class="bg-white w-full max-w-2xl p-4 min-[640px]:p-6 rounded-t-2xl min-[640px]:rounded-2xl shadow-2xl transition-transform transform translate-y-full duration-300 flex flex-col h-[85vh] min-[640px]:h-[70vh]" id="expert-modal-content" onclick="event.stopPropagation()">
+            <div class="flex justify-between items-center mb-4 border-b border-slate-100 pb-3 shrink-0">
+                <h3 class="font-black text-slate-800 text-[13px] uppercase tracking-tight">✏️ Редактировать заключение</h3>
+                <div class="w-8 h-8 bg-slate-100 rounded-full flex items-center justify-center text-slate-500 font-bold cursor-pointer hover:bg-slate-200 active:scale-95" onclick="cancelExpertEdit()">✕</div>
+            </div>
+            
+            <div class="bg-blue-50 text-blue-800 p-2 rounded-lg text-[10px] mb-3 shrink-0 font-medium">
+                Вы можете изменить текст по своему усмотрению. Он будет сохранен и пойдет в итоговый PDF-отчет. Оставьте пустые строки для красивых абзацев.
+            </div>
+            
+            <textarea id="modal-expert-input" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-[12px] text-slate-800 outline-none focus:border-indigo-500 transition-all resize-none flex-1 shadow-inner font-mono leading-relaxed"></textarea>
+            
+            <div class="flex gap-2 mt-4 shrink-0">
+                <button onclick="resetExpertEdit()" class="bg-slate-100 text-slate-600 border border-slate-200 px-3 py-3 rounded-xl font-bold text-[10px] uppercase tracking-wider active:scale-95">Сбросить</button>
+                <button onclick="saveExpertEdit()" class="flex-1 bg-indigo-600 text-white px-4 py-3 rounded-xl font-bold text-[11px] uppercase tracking-wider active:scale-95 shadow-md">Сохранить правки</button>
+            </div>
+        </div>
+    </div>
     <!-- НОВОЕ Окно для ввода комментария -->
     <div id="comment-modal-overlay" class="fixed inset-0 bg-slate-900/70 z-[150] hidden items-end min-[640px]:items-center justify-center p-0 min-[640px]:p-4 backdrop-blur-sm transition-opacity" onclick="cancelComment()">
         <div class="bg-white w-full max-w-md p-5 rounded-t-2xl min-[640px]:rounded-2xl shadow-2xl transition-transform transform translate-y-full duration-300" id="comment-modal-content" onclick="event.stopPropagation()">
@@ -312,6 +352,7 @@
                     <!-- Кнопка Быстро -->
                     <div class="flex items-center gap-1 bg-slate-100 px-2 py-1.5 rounded-md border border-slate-200 cursor-pointer active:scale-95 transition-transform" onclick="toggleFastMode()" id="fast-mode-btn">
                         <span class="text-[9px] font-bold text-slate-500">⚡</span>
+                        <span onclick="event.stopPropagation(); alert('Быстрый режим: скрывает тексты нормативов из чек-листа, оставляя только суть. Полезно для опытных инженеров.')" class="demo-hint hidden"></span>
                         <div class="w-5 h-2.5 bg-slate-300 rounded-full relative" id="fast-mode-toggle">
                             <div class="w-2.5 h-2.5 bg-white rounded-full absolute left-0 shadow-sm transition-all" id="fast-mode-knob"></div>
                         </div>
@@ -343,7 +384,10 @@
             <!-- Строка 3: Блок данных проверки (содержит название чек-листа) -->
             <div id="data-block-container" class="bg-slate-50 border border-slate-200 rounded-md p-1.5 mb-1 shadow-sm transition-all">
                 <div class="flex justify-between items-center cursor-pointer px-1" onclick="toggleDataBlock()">
-                    <div id="current-checklist-label" class="text-[9px] font-black text-slate-600 uppercase tracking-wider truncate pr-2">Вид работ не выбран</div>
+                    <div class="flex items-center pr-2 min-w-0">
+                        <div id="current-checklist-label" class="text-[9px] font-black text-slate-600 uppercase tracking-wider truncate">Вид работ не выбран</div>
+                        <span onclick="event.stopPropagation(); alert('Блок данных (Шапка). Впишите сюда название объекта, свои ФИО, подрядчика и место проверки. В демо-режиме блок открыт по умолчанию, но его можно свернуть')" class="demo-hint hidden"></span>
+                    </div>
                     <div id="data-toggle-icon" class="text-slate-400 text-[8px] font-bold bg-white px-1.5 py-0.5 rounded border border-slate-200 shadow-sm transition-transform shrink-0">СВЕРНУТЬ ▲</div>
                 </div>
                 <div id="data-block-content" class="grid grid-cols-1 min-[350px]:grid-cols-2 gap-1 mt-1.5 transition-all">
@@ -356,11 +400,14 @@
             </div>
 
             <!-- Строка 4: Навигационные вкладки -->
-            <div class="tabs-container">
-                <div class="tab-btn active" onclick="switchTab('tab-audit', this)">Осмотр</div>
-                <div class="tab-btn" onclick="switchTab('tab-history', this)">История (<span id="hist-count">0</span>)</div>
-                <div class="tab-btn" onclick="switchTab('tab-analytics', this)">Аналитика</div>
-                <div class="tab-btn" onclick="switchTab('tab-rating', this)">Рейтинг</div>
+            <div class="relative w-full">
+                <span onclick="event.stopPropagation(); alert('ГЛАВНОЕ МЕНЮ: ОСМОТР — заполнение текущего чек-листа. ИСТОРИЯ — архив всех сохраненных проверок.АНАЛИТИКА — графики, отчеты и экспертные заключения ИИ. РЕЙТИНГ — топ подрядчиков по качеству.')" class="demo-hint hidden absolute -top-3 left-2 z-50 shadow-lg">ПОДСКАЗКА</span>
+                <div class="tabs-container">
+                    <div class="tab-btn active" onclick="switchTab('tab-audit', this)">Осмотр</div>
+                    <div class="tab-btn" onclick="switchTab('tab-history', this)">История (<span id="hist-count">0</span>)</div>
+                    <div class="tab-btn" onclick="switchTab('tab-analytics', this)">Аналитика</div>
+                    <div class="tab-btn" onclick="switchTab('tab-rating', this)">Рейтинг</div>
+                </div>
             </div>
         </div>
     </header>
@@ -378,7 +425,7 @@
                     <div class="flex justify-between items-start mb-1.5">
                         <div class="text-[9px] font-black text-indigo-500 uppercase tracking-wide leading-tight flex items-center gap-1">
                             УрК Подрядчика
-                            <span onclick="event.stopPropagation(); alert('Это накопительный рейтинг подрядчика. Он появится автоматически, как только вы сохраните минимум 7 проверок по этому виду работ.')" class="cursor-pointer text-indigo-500 text-[12px] demo-hint hidden">ⓘ</span>
+                            <span onclick="event.stopPropagation(); alert('Это накопительный рейтинг подрядчика. Он появится автоматически, как только вы сохраните минимум 7 проверок по этому виду работ. Нажатие на саму карточку откроет доп. информацию')" class="cursor-pointer text-indigo-500 text-[12px] demo-hint hidden">ⓘ</span>
                         </div>
                         <div id="dash-c-count" class="text-[9px] font-bold text-indigo-500 bg-white px-1.5 py-0.5 rounded shadow-sm border border-indigo-100 shrink-0" title="Количество проверок">0/7+</div>
                     </div>
@@ -405,7 +452,7 @@
                     <div class="flex justify-between items-start mb-1.5">
                         <div class="text-[9px] font-black text-slate-400 uppercase tracking-wide leading-tight flex items-center gap-1">
                             УрК Изделия
-                            <span onclick="event.stopPropagation(); alert('Это текущая оценка проверяемого объекта. Она пересчитывается в реальном времени при каждом нажатии кнопок OK / FAIL в чек-листе ниже.')" class="cursor-pointer text-indigo-500 text-[12px] demo-hint hidden">ⓘ</span>
+                            <span onclick="event.stopPropagation(); alert('Это текущая оценка проверяемого объекта. Она пересчитывается в реальном времени при каждом нажатии кнопок OK / FAIL в чек-листе ниже. При нажатии на саму карточку откроется окно с пояснением расчета')" class="cursor-pointer text-indigo-500 text-[12px] demo-hint hidden">ⓘ</span>
                         </div>
                         <div class="w-4 h-4 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 text-[10px] font-bold shrink-0">?</div>
                     </div>
@@ -463,7 +510,7 @@
                         <button onclick="startDemoMode()" class="w-full bg-gradient-to-r from-sky-500 to-indigo-500 text-white py-3 rounded-xl font-black text-xs uppercase tracking-widest hover:opacity-90 transition-all shadow-md active:scale-95 flex justify-center items-center gap-2">
                             🎮 Запустить Демо-режим
                         </button>
-                        <div class="text-[10px] text-slate-400 leading-tight mt-1">Для новичков. Приложение заполнится тестовыми данными (рейтинги, фото).</div>
+                        <div class="text-[11px] text-slate-400 leading-tight mt-1">Для новичков. Приложение заполнится тестовыми данными (рейтинги, фото). Появятся подсказки. Все основные кнопки будут работать</div>
                     </div>
                     
                     <!-- Кнопка РЕАЛЬНАЯ РАБОТА (Хитрая) -->
@@ -479,7 +526,7 @@
                             <optgroup label="Загруженные" id="fake-user-group"></optgroup>
                         </select>
                         
-                        <div class="text-[10px] text-slate-400 leading-tight mt-1">Я бывалый технадзор и знаю как работать. Начать реальную проверку.</div>
+                        <div class="text-[11px] text-slate-400 leading-tight mt-1">Я бывалый технадзор и знаю как работать. Начать реальную проверку.</div>
                     </div>
                 </div>
             </div>
@@ -1948,11 +1995,14 @@ const SYSTEM_TEMPLATES = {
             // 2. Включаем флаг
             isDemoMode = true;
             document.body.classList.add('demo-mode');
+            
+            // Превращаем все мелкие 'ⓘ' в яркие кнопки 'ПОДСКАЗКА'
+            document.querySelectorAll('.demo-hint').forEach(el => el.innerText = 'ПОДСКАЗКА');
 
             // 3. Генерируем фейковую базу данных (contractorArray)
             contractorArray = generateDemoHistory();
 
-            // 4. Заполняем текущую форму, чтобы показать как выглядит процесс осмотра
+            // 4. Заполняем текущую форму
             document.getElementById('inp-project').value = 'ЖК "Демонстрационный"';
             document.getElementById('inp-inspector').value = 'Иванов И.И. (Демо)';
             document.getElementById('inp-contractor').value = 'ООО "Монолит-Строй" (Каркас)';
@@ -1991,6 +2041,10 @@ const SYSTEM_TEMPLATES = {
             render();
             updateUI();
             showToast('🎮 Демо-режим активирован!');
+            
+            // ПРИНУДИТЕЛЬНО ОТКРЫВАЕМ БЛОК ДАННЫХ И СКРОЛЛИМ НАВЕРХ
+            toggleDataBlock(true);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
         function exitDemoMode() {
@@ -2572,6 +2626,7 @@ const SYSTEM_TEMPLATES = {
             const navRoot = document.getElementById('mini-progress-nav');
             
             let html = ""; let navHtml = "";
+            let extraHintShown = false; // Флаг, чтобы показать подсказку доп. кнопок только 1 раз
 
             currentChecklist.forEach((g, gIndex) => {
                 let gTotal = g.items.length; let gChecked = 0; let gHasB2 = false; let gHasB3 = false;
@@ -2589,12 +2644,17 @@ const SYSTEM_TEMPLATES = {
                 else if(gChecked > 0) pillClass = gHasB3 ? 'pill-red' : (gHasB2 ? 'pill-yellow' : 'pill-gray');
 
                 const shortTitle = (g.group || g.title).split('.')[1]?.trim() || (g.group || g.title).substring(0, 15)+'...';
-                // Вызываем новую функцию точного скролла
+                
+                // Подсказка для быстрой навигации (только перед первой кнопкой)
+                if (gIndex === 0) {
+                    navHtml += `<span onclick="event.stopPropagation(); alert('БЫСТРАЯ НАВИГАЦИЯ:\\nНажимайте на эти кнопки, чтобы мгновенно перемещаться к нужным разделам чек-листа (Фундамент, Стены, Кровля и т.д.) без долгого скролла вниз.')" class="demo-hint hidden shrink-0 self-center shadow-lg">ПОДСКАЗКА</span>`;
+                }
+
                 navHtml += `<div class="progress-pill ${pillClass}" onclick="scrollToGroup(${gIndex})" title="${g.group || g.title}">${shortTitle} ${gChecked}/${gTotal}</div>`;
 
                 html += `<div class="block-title" id="group_${gIndex}">${g.group || g.title}</div>`;
                 
-                g.items.forEach(i => {
+                g.items.forEach((i, iIndex) => {
                     const s = state[i.id];
                     let weightTag = `<span class="weight-tag wt-${i.w}">B${i.w}</span>`;
                     
@@ -2606,10 +2666,14 @@ const SYSTEM_TEMPLATES = {
                     let commentBlockHtml = '';
                     let visualIndicatorHtml = '';
 
-                    // Доп. кнопки УВЕЛИЧЕНЫ до 40px (было 32px)
+                    // Подсказка для дополнительных кнопок (только на первом ошибочном пункте)
+                    let extraHintHtml = '';
+                    if (failActive && !extraHintShown) {
+                        extraHintHtml = `<span onclick="event.stopPropagation(); alert('ДОПОЛНИТЕЛЬНЫЕ ИНСТРУМЕНТЫ (Необязательные):\\n\\n💬 Комментарий — детально описать суть дефекта (обязательно выводится в PDF-отчет).\\n📸 Фото — сделать снимок нарушения прямо с камеры.\\n>1.5 — нажать, если отклонение превышает допуск более чем в 1.5 раза (это автоматически делает ошибку Критической - B3).')" class="demo-hint hidden absolute -top-4 right-2 z-10 shadow-lg">ПОДСКАЗКА</span>`;
+                        extraHintShown = true;
+                    }
+
                     if (failActive) {
-                        
-                        // 1. Кнопка Комментария с крестиком удаления
                         let hasComment = details[i.id]?.comment && details[i.id].comment.trim() !== "";
                         let commBtn = '';
                         if (hasComment) {
@@ -2621,7 +2685,6 @@ const SYSTEM_TEMPLATES = {
                             commBtn = `<button onclick="toggleCommentField(${i.id})" class="btn-status bg-slate-50 text-slate-400 border-slate-200 hover:bg-slate-200 !w-10 !h-10 !min-w-[40px] !rounded-md" title="Добавить комментарий"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path></svg></button>`;
                         }
                         
-                        // 2. Кнопка Фото с крестиком удаления
                         let photoBtn = '';
                         if (photos[i.id]) {
                             photoBtn = `<div class="relative inline-block">
@@ -2632,15 +2695,13 @@ const SYSTEM_TEMPLATES = {
                             photoBtn = `<button onclick="triggerPhotoInput(${i.id})" class="btn-status bg-slate-50 text-slate-400 border-slate-200 hover:bg-slate-200 !w-10 !h-10 !min-w-[40px] !rounded-md" title="Прикрепить фото"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path><circle cx="12" cy="13" r="3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></circle></svg></button>`;
                         }
 
-                        // 3. Кнопка >1.5
                         let escBtn = '';
                         if (i.w === 2) {
                             escBtn = `<button onclick="toggleEscalation(${i.id})" class="btn-status ${isEscalated ? 'bg-red-600 text-white border-red-600 shadow-md' : 'bg-orange-50 text-orange-500 border-orange-200 hover:bg-orange-100'} !w-10 !h-10 !min-w-[40px] !rounded-md" title="Превышение >1.5"><span class="text-[11px] font-black">>1.5</span></button>`;
                         }
 
-                        extraBtnsHtml = `<div class="flex gap-1.5 shrink-0 ml-2 items-center justify-end">${commBtn}${photoBtn}${escBtn}</div>`;
+                        extraBtnsHtml = `<div class="flex gap-1.5 shrink-0 ml-2 items-center justify-end relative">${extraHintHtml}${commBtn}${photoBtn}${escBtn}</div>`;
 
-                        // Показываем текст комментария снизу карточки
                         if (hasComment) {
                             commentBlockHtml = `<div class="mt-2 text-[12px] font-semibold text-slate-700 italic bg-white bg-opacity-70 p-2 rounded-md border border-red-100 leading-snug">💬 ${details[i.id].comment}</div>`;
                         }
@@ -2650,9 +2711,12 @@ const SYSTEM_TEMPLATES = {
                         }
                     }
 
-                    // Основные кнопки OK / FAIL (УВЕЛИЧЕНЫ до 48px, были 40px)
+                    // Подсказка для OK/FAIL (только на самом первом пункте чек-листа)
+                    let okFailHint = (gIndex === 0 && iIndex === 0) ? `<span onclick="event.stopPropagation(); alert('КНОПКИ ОЦЕНКИ:\\n✅ Зеленая (OK) — нарушений нет.\\n❌ Красная (FAIL) — зафиксировано нарушение.\\n\\nНажатие мгновенно пересчитывает общую оценку УрК Изделия (в шапке) по специальной формуле.')" class="demo-hint hidden absolute -top-4 right-0 z-10 shadow-lg">ПОДСКАЗКА</span>` : '';
+
                     let mainBtnsHtml = `
-                    <div class="flex gap-1.5 shrink-0 ml-2">
+                    <div class="flex gap-1.5 shrink-0 ml-2 relative">
+                        ${okFailHint}
                         <button onclick="toggleOk(${i.id})" class="btn-status ${okActive ? 'bg-green-500 text-white border-green-500 shadow-md' : 'bg-slate-50 text-slate-300 hover:bg-slate-100'} !w-12 !h-12 !min-w-[48px]">
                             <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
                         </button>
@@ -2663,7 +2727,6 @@ const SYSTEM_TEMPLATES = {
 
                     let cardBgClass = failActive ? 'bg-red-50 border-red-100' : (okActive ? 'bg-green-50 border-green-100' : '');
 
-                    // УВЕЛИЧЕНЫ ШРИФТЫ: text-[13px] (был 11px) и text-[11px] (был 9px)
                     html += `
                     <div class="card-audit p-2.5 indicator-${s ? (okActive ? 'ok' : (isEscalated ? 3 : i.w)) : i.w} ${cardBgClass}" id="item_${i.id}">
                         <div class="flex justify-between items-center min-h-[48px]">
@@ -3246,7 +3309,6 @@ if (isDemoMode) { showToast('⚠️ В демо-режиме сохранени�
         function renderAnalyticsTab() {
             const container = document.getElementById('analytics-contractors-container');
             
-            // Очищаем старые графики, чтобы они не накладывались друг на друга
             for (const key in chartInstances) { if (chartInstances[key]) chartInstances[key].destroy(); }
             chartInstances = {};
 
@@ -3255,7 +3317,6 @@ if (isDemoMode) { showToast('⚠️ В демо-режиме сохранени�
                 return;
             }
 
-            // Читаем фильтры
             const selContr = document.getElementById('analytics-contractor-select').value;
             const selTmpl = document.getElementById('analytics-template-select').value;
             const selPeriod = document.getElementById('analytics-period-select').value;
@@ -3263,7 +3324,6 @@ if (isDemoMode) { showToast('⚠️ В демо-режиме сохранени�
             let baseArray = contractorArray;
             const now = new Date();
             
-            // Применяем фильтры
             if (selPeriod === 'DAY') { baseArray = baseArray.filter(i => new Date(i.date).toDateString() === now.toDateString()); } 
             else if (selPeriod === 'MONTH') { const m = new Date(); m.setDate(now.getDate()-30); baseArray = baseArray.filter(i => new Date(i.date) >= m); } 
             else if (selPeriod === 'WEEK') { const w = new Date(); w.setDate(now.getDate()-7); baseArray = baseArray.filter(i => new Date(i.date) >= w); }
@@ -3276,13 +3336,9 @@ if (isDemoMode) { showToast('⚠️ В демо-режиме сохранени�
             let html = ""; 
             let chartConfigs = [];
 
-            // ==========================================
-            // --- НОВЫЙ СВОДНЫЙ ДАШБОРД (SUMMARY) ---
-            // ==========================================
             let sumUrk = 0; let sumB3 = 0;
             let contractorMap = {}; let templateMap = {};
 
-            // Собираем общую статистику
             baseArray.forEach(item => {
                 sumUrk += item.metrics.final;
                 sumB3 += item.metrics.n_B3_fail;
@@ -3302,7 +3358,6 @@ if (isDemoMode) { showToast('⚠️ В демо-режиме сохранени�
             const avgColor = avgUrk < 70 ? 'text-red-600' : (avgUrk < 85 ? 'text-orange-500' : 'text-green-600');
             const b3Color = sumB3 > 0 ? 'text-red-600' : 'text-slate-800';
 
-            // Подготовка данных для столбчатых диаграмм
             const cLabels = Object.keys(contractorMap).map(k => k.length > 15 ? k.substring(0, 15) + '...' : k);
             const cData = Object.keys(contractorMap).map(k => Math.round(contractorMap[k].sum / contractorMap[k].count));
             
@@ -3311,23 +3366,23 @@ if (isDemoMode) { showToast('⚠️ В демо-режиме сохранени�
 
             html += `
             <div class="mb-8 bg-white border border-slate-200 rounded-xl overflow-hidden shadow-md">
-                <div class="bg-slate-800 text-white p-3 font-black text-sm uppercase tracking-wider flex justify-between items-center">
-                    <span>📊 Сводный Дашборд Объекта</span>
-                    <span class="text-[10px] font-bold text-slate-300 bg-slate-700 px-2 py-1 rounded">Выборка: ${baseArray.length}</span>
+                <div class="bg-slate-800 text-white p-3 font-black text-sm uppercase tracking-wider flex flex-col min-[450px]:flex-row justify-between items-start min-[450px]:items-center gap-2">
+                    <span class="leading-tight">📊 Сводный Дашборд</span>
+                    <span class="text-[10px] font-bold text-slate-300 bg-slate-700 px-2 py-1 rounded w-fit">Выборка: ${baseArray.length}</span>
                 </div>
-                <div class="p-4 bg-slate-50">
-                    <div class="grid grid-cols-3 gap-2 mb-5 text-center">
-                        <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
-                            <div class="text-[9px] text-slate-400 uppercase font-bold mb-1 leading-tight">Средний УрК</div>
-                            <div class="text-3xl min-[380px]:text-4xl font-black ${avgColor} leading-none tracking-tighter">${avgUrk}%</div>
+                <div class="p-3 min-[400px]:p-4 bg-slate-50">
+                    <div class="grid grid-cols-1 min-[380px]:grid-cols-3 gap-2 mb-5 text-center">
+                        <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex flex-row min-[380px]:flex-col justify-between items-center min-[380px]:justify-center">
+                            <div class="text-[10px] min-[380px]:text-[9px] text-slate-400 uppercase font-bold mb-0 min-[380px]:mb-1 leading-tight">Средний УрК</div>
+                            <div class="text-2xl min-[380px]:text-3xl font-black ${avgColor} leading-none tracking-tighter">${avgUrk}%</div>
                         </div>
-                        <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
-                            <div class="text-[9px] text-slate-400 uppercase font-bold mb-1 leading-tight">Проверок</div>
-                            <div class="text-3xl min-[380px]:text-4xl font-black text-slate-700 leading-none tracking-tighter">${baseArray.length}</div>
+                        <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex flex-row min-[380px]:flex-col justify-between items-center min-[380px]:justify-center">
+                            <div class="text-[10px] min-[380px]:text-[9px] text-slate-400 uppercase font-bold mb-0 min-[380px]:mb-1 leading-tight">Проверок</div>
+                            <div class="text-2xl min-[380px]:text-3xl font-black text-slate-700 leading-none tracking-tighter">${baseArray.length}</div>
                         </div>
-                        <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
-                            <div class="text-[9px] text-slate-400 uppercase font-bold mb-1 leading-tight">Крит. ошибки</div>
-                            <div class="text-3xl min-[380px]:text-4xl font-black ${b3Color} leading-none tracking-tighter">${sumB3}</div>
+                        <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex flex-row min-[380px]:flex-col justify-between items-center min-[380px]:justify-center">
+                            <div class="text-[10px] min-[380px]:text-[9px] text-slate-400 uppercase font-bold mb-0 min-[380px]:mb-1 leading-tight">Крит. ошибки</div>
+                            <div class="text-2xl min-[380px]:text-3xl font-black ${b3Color} leading-none tracking-tighter">${sumB3}</div>
                         </div>
                     </div>
 
@@ -3344,12 +3399,9 @@ if (isDemoMode) { showToast('⚠️ В демо-режиме сохранени�
                 </div>
             </div>`;
 
-            // Сохраняем конфиги для сводных графиков
             chartConfigs.push({ id: 'chart_summary_c', type: 'bar', labels: cLabels, data: cData });
             chartConfigs.push({ id: 'chart_summary_t', type: 'bar', labels: tLabels, data: tData });
-            // ==========================================
 
-            // Группируем данные для детальной разбивки
             let blocksToProcess = [];
             const uniqueCs = [...new Set(baseArray.map(i => i.contractorName))];
             
@@ -3381,11 +3433,11 @@ if (isDemoMode) { showToast('⚠️ В демо-режиме сохранени�
                             let photoTag = '';
                             if (unit.photos && unit.photos[i.id]) {
                                 failCounts[i.id].photo = unit.photos[i.id];
-                                photoTag = `<img src="${unit.photos[i.id]}" class="mini-thumb" onclick="openPhotoViewer('${unit.photos[i.id]}')" />`;
+                                photoTag = `<img src="${unit.photos[i.id]}" class="mini-thumb shrink-0" onclick="openPhotoViewer('${unit.photos[i.id]}')" />`;
                                 allPhotos.push({ src: unit.photos[i.id], loc: unit.location, date: new Date(unit.date).toLocaleDateString('ru-RU') });
                             }
                             if (i.w === 3 || s === 'fail_escalated') {
-                                critList.push(`<div class="flex items-center justify-between border-b border-red-100 pb-2 mb-2"><div class="text-[11px] text-red-700 font-bold leading-snug">[${new Date(unit.date).toLocaleDateString()}] ${unit.location}: ${i.n}</div>${photoTag}</div>`);
+                                critList.push(`<div class="flex flex-col min-[380px]:flex-row min-[380px]:items-center justify-between border-b border-red-100 pb-2 mb-2 gap-2"><div class="text-[11px] text-red-700 font-bold leading-snug break-words w-full"><span class="text-red-400 block text-[9px] mb-0.5">[${new Date(unit.date).toLocaleDateString()}] ${unit.location}</span>${i.n}</div><div class="self-start min-[380px]:self-center">${photoTag}</div></div>`);
                             }
                         }
                     });
@@ -3394,12 +3446,12 @@ if (isDemoMode) { showToast('⚠️ В демо-режиме сохранени�
                 const sortedFails = Object.values(failCounts).filter(x => x.count > 0).sort((a, b) => b.count - a.count).slice(0, 5);
                 
                 let topDefectsHtml = sortedFails.length > 0 ? sortedFails.map(f => `
-                    <div class="defect-item">
-                        <div class="flex-1 mr-2 leading-snug">
-                            <span class="weight-tag wt-${f.w}">B${f.w}</span> 
-                            <span class="text-[11px] text-slate-700 font-bold">${f.n}</span>
+                    <div class="defect-item flex-col min-[450px]:flex-row items-start min-[450px]:items-center gap-2">
+                        <div class="flex-1 w-full min-w-0 leading-snug">
+                            <span class="weight-tag wt-${f.w} shrink-0">B${f.w}</span> 
+                            <span class="text-[11px] text-slate-700 font-bold break-words">${f.n}</span>
                         </div>
-                        <div class="flex items-center">
+                        <div class="flex items-center gap-2 self-start min-[450px]:self-end shrink-0">
                             <div class="bg-slate-100 text-slate-600 px-2 py-1 rounded text-[10px] font-black">${f.count} раз</div>
                             ${f.photo ? `<img src="${f.photo}" class="mini-thumb" onclick="openPhotoViewer('${f.photo}')"/>` : ''}
                         </div>
@@ -3407,40 +3459,46 @@ if (isDemoMode) { showToast('⚠️ В демо-режиме сохранени�
                 
                 let critDefectsHtml = critList.length > 0 ? critList.join('') : `<p class="text-[11px] text-red-400 p-2 font-bold text-center">Критических дефектов нет.</p>`;
                 
-                let galleryHtml = allPhotos.length > 0 ? `<div class="photo-gallery">${allPhotos.slice(-6).reverse().map(p => `<div class="photo-card" onclick="openPhotoViewer('${p.src}')"><img src="${p.src}" /><div class="photo-card-info">${p.loc}</div></div>`).join('')}</div>` : `<p class="text-xs text-slate-400 text-center py-6">Нет прикрепленных фотографий.</p>`;
+                let galleryHtml = allPhotos.length > 0 ? `<div class="photo-gallery grid-cols-2 min-[400px]:grid-cols-3">${allPhotos.slice(-6).reverse().map(p => `<div class="photo-card" onclick="openPhotoViewer('${p.src}')"><img src="${p.src}" /><div class="photo-card-info leading-tight">${p.loc}</div></div>`).join('')}</div>` : `<p class="text-xs text-slate-400 text-center py-6">Нет прикрепленных фотографий.</p>`;
 
                 let cMetricsHtml = "";
                 if (filteredArray.length >= 7) {
                     const cM = getContractorMetrics(filteredArray);
                     if (cM) {
                         let cColor = cM.isRedZone ? 'text-red-600' : (cM.finalC < 85 ? 'text-orange-500' : 'text-green-600');
+                        
+                        // ВЫЗЫВАЕМ НАШ ГЕНЕРАТОР ЗАКЛЮЧЕНИЙ
+                        const expertData = getExpertConclusion(cM, block.contractor, block.template, filteredArray.length, safeNameId);
+                        
                         cMetricsHtml = `
-                        <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-6 shadow-sm">
-                            <div class="flex items-center justify-between mb-3 border-b border-slate-200 pb-2">
+                        <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 min-[400px]:p-4 shadow-sm">
+                            <div class="flex flex-col min-[380px]:flex-row items-start min-[380px]:items-center justify-between mb-3 border-b border-slate-200 pb-2 gap-2">
                                 <div class="text-[11px] font-bold text-slate-500 uppercase">УрК Подрядчика</div>
-                                <div class="status-tag ${cM.statusCls} !text-[9px]">${cM.statusTxt}</div>
+                                <div class="status-tag ${cM.statusCls} !text-[9px] w-fit">${cM.statusTxt}</div>
                             </div>
                             <div class="flex items-end justify-between">
-                                <div class="text-4xl font-black ${cColor} leading-none tracking-tighter">${cM.finalC}%</div>
-                                <div class="text-right text-[10px] text-slate-500 font-bold">
-                                    <div>База: ${cM.baseUrkContrPerc}%</div>
-                                    <div>Ks: ${cM.ks.toFixed(2)} | Kcrit: ${cM.kcritC.toFixed(2)}</div>
+                                <div class="text-4xl min-[400px]:text-5xl font-black ${cColor} leading-none tracking-tighter">${cM.finalC}%</div>
+                                <div class="text-right text-[10px] text-slate-500 font-bold bg-white p-1.5 rounded border border-slate-200 shadow-inner">
+                                    <div class="mb-0.5">База: <span class="text-slate-800">${cM.baseUrkContrPerc}%</span></div>
+                                    <div>Ks: <span class="text-slate-800">${cM.ks.toFixed(2)}</span> | Kcrit: <span class="text-slate-800">${cM.kcritC.toFixed(2)}</span></div>
                                 </div>
                             </div>
-                        </div>`;
+                        </div>
+                        ${expertData.uiHtml} <!-- ВСТАВЛЯЕМ БЛОК В ИНТЕРФЕЙС -->
+                        `;
                     }
                 } else {
-                    cMetricsHtml = `<div class="bg-yellow-50 text-yellow-800 p-3 rounded-lg border border-yellow-200 font-bold text-[10px] mb-6 shadow-sm">Собрано ${filteredArray.length} изд. Для расчета УрК нужно минимум 7.</div>`;
+                    cMetricsHtml = `<div class="bg-yellow-50 text-yellow-800 p-3 rounded-lg border border-yellow-200 font-bold text-[10px] mb-6 shadow-sm leading-snug">Собрано ${filteredArray.length} изд. Для расчета УрК нужно минимум 7.</div>`;
                 }
 
                 html += `
                     <div class="mb-8 bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
-                        <div class="bg-slate-800 text-white p-3 font-black text-sm uppercase tracking-wider flex justify-between items-center">
-                            <span>🏗️ ${block.contractor}</span>
-                            <span class="text-[10px] font-bold text-slate-300 bg-slate-700 px-2 py-1 rounded">Выборка: ${filteredArray.length}</span>
+                        <div class="bg-slate-800 text-white p-3 font-black text-sm uppercase tracking-wider flex flex-col min-[450px]:flex-row justify-between items-start min-[450px]:items-center gap-2">
+                            <span class="break-words leading-tight w-full">🏗️ ${block.contractor}</span>
+                            <span class="text-[10px] font-bold text-slate-300 bg-slate-700 px-2 py-1 rounded shrink-0">Выборка: ${filteredArray.length}</span>
                         </div>
-                        <div class="bg-slate-100 border-b border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 uppercase">${block.template}</div>
-                        <div class="p-4">
+                        <div class="bg-slate-100 border-b border-slate-200 px-3 min-[400px]:px-4 py-2 text-[10px] min-[400px]:text-xs font-bold text-slate-600 uppercase break-words leading-snug">${block.template}</div>
+                        <div class="p-3 min-[400px]:p-4">
                             ${cMetricsHtml}
                             <div class="text-[11px] font-bold text-slate-400 uppercase mb-2">График качества по проверкам</div>
                             <div class="chart-container"><canvas id="chart_ui_${safeNameId}"></canvas></div>
@@ -3458,15 +3516,12 @@ if (isDemoMode) { showToast('⚠️ В демо-режиме сохранени�
 
             container.innerHTML = html;
             
-            // Функция для раскраски столбиков в зависимости от процента
             const getColor = (value) => value < 70 ? '#ef4444' : (value < 85 ? '#f59e0b' : '#22c55e');
 
-            // Отрисовка всех графиков
             chartConfigs.forEach(cfg => {
                 const ctx = document.getElementById(cfg.id).getContext('2d');
                 
                 if (cfg.type === 'bar') {
-                    // Столбчатая диаграмма для сводного дашборда
                     const bgColors = cfg.data.map(val => getColor(val));
                     chartInstances[cfg.id] = new Chart(ctx, {
                         type: 'bar',
@@ -3478,7 +3533,6 @@ if (isDemoMode) { showToast('⚠️ В демо-режиме сохранени�
                         }
                     });
                 } else {
-                    // Линейный график для каждого подрядчика (оставляем как было)
                     chartInstances[cfg.id] = new Chart(ctx, {
                         type: 'line', 
                         data: { labels: cfg.labels, datasets: [{ data: cfg.data, borderColor: '#4f46e5', backgroundColor: '#4f46e5', tension: 0.3, borderWidth: 2, pointRadius: 3 }] },
@@ -3541,27 +3595,27 @@ if (isDemoMode) { showToast('⚠️ В демо-режиме сохранени�
                 const rankClass = index === 0 ? 'rank-1' : (index === 1 ? 'rank-2' : (index === 2 ? 'rank-3' : 'bg-slate-300 text-slate-600'));
                 return `
                 <div class="rating-card">
-                    <div class="flex items-start justify-between border-b border-slate-100 pb-3 mb-3">
-                        <div class="flex items-center gap-4">
-                            <div class="rank-badge ${rankClass}">${index + 1}</div>
-                            <div>
-                                <div class="text-base font-black text-slate-800">${r.name}</div>
-                                <span class="${r.metrics.confCls}">${r.metrics.confStatus}</span>
+                    <div class="flex flex-col min-[450px]:flex-row items-start justify-between border-b border-slate-100 pb-3 mb-3 gap-3">
+                        <div class="flex items-start gap-3 w-full min-[450px]:w-auto">
+                            <div class="rank-badge shrink-0 ${rankClass}">${index + 1}</div>
+                            <div class="min-w-0">
+                                <div class="text-sm font-black text-slate-800 leading-tight break-words">${r.name}</div>
+                                <span class="${r.metrics.confCls} mt-1 inline-block">${r.metrics.confStatus}</span>
                             </div>
                         </div>
-                        <div class="text-right">
-                            <div class="text-3xl font-black text-slate-800">${r.metrics.finalC}%</div>
-                            <span class="${r.metrics.riskCls} text-[10px] uppercase">${r.metrics.riskStatus}</span>
+                        <div class="bg-slate-50 min-[450px]:bg-transparent p-2 min-[450px]:p-0 rounded-lg w-full min-[450px]:w-auto text-left min-[450px]:text-right shrink-0 flex min-[450px]:block justify-between items-center">
+                            <div class="text-2xl min-[450px]:text-3xl font-black text-slate-800 leading-none">${r.metrics.finalC}%</div>
+                            <span class="${r.metrics.riskCls} text-[10px] uppercase block mt-0 min-[450px]:mt-1">${r.metrics.riskStatus}</span>
                         </div>
                     </div>
-                    <div class="grid grid-cols-2 gap-x-4 gap-y-2 text-[11px] text-slate-500 font-bold mb-3 pb-3 border-b border-slate-100">
-                        <div>Выборка: <span class="text-slate-800">${r.metrics.count} шт.</span></div>
-                        <div>Доля B3: <span class="text-slate-800">${r.metrics.rateB3.toFixed(1)}%</span></div>
-                        <div>Индекс стаб.: <span class="text-slate-800">${r.metrics.stabilityIndex}</span></div>
-                        <div>Волатильность: <span class="text-slate-800">${r.metrics.volatility.toFixed(1)}</span></div>
+                    <div class="grid grid-cols-1 min-[380px]:grid-cols-2 gap-x-4 gap-y-2 text-[11px] text-slate-500 font-bold mb-3 pb-3 border-b border-slate-100">
+                        <div class="flex justify-between min-[380px]:block"><span>Выборка:</span> <span class="text-slate-800">${r.metrics.count} шт.</span></div>
+                        <div class="flex justify-between min-[380px]:block"><span>Доля B3:</span> <span class="text-slate-800">${r.metrics.rateB3.toFixed(1)}%</span></div>
+                        <div class="flex justify-between min-[380px]:block"><span>Индекс стаб.:</span> <span class="text-slate-800">${r.metrics.stabilityIndex}</span></div>
+                        <div class="flex justify-between min-[380px]:block"><span>Волатильность:</span> <span class="text-slate-800">${r.metrics.volatility.toFixed(1)}</span></div>
                     </div>
                     <div class="text-[10px] text-slate-400 font-bold uppercase mb-1">Основание:</div>
-                    <div class="text-[11px] font-bold text-red-600 bg-red-50 p-2 rounded-lg border border-red-100">${r.metrics.reason}</div>
+                    <div class="text-[11px] font-bold text-red-600 bg-red-50 p-2 rounded-lg border border-red-100 leading-snug">${r.metrics.reason}</div>
                 </div>`;
             }).join('');
         }
@@ -3651,22 +3705,11 @@ if (isDemoMode) { showToast('⚠️ В демо-режиме сохранени�
                     if (cCount >= 7) {
                         const c = getContractorMetrics(cData);
                         
-                        // Внедрение блока РЕШЕНИЕ (Change 13, 16)
-                        let reqAction = "Продолжить работы в текущем режиме.";
-                        let hasCrit = "Нет";
-                        if(c.isRedZone || c.rateB3 >= 30) { reqAction = "Остановить работы. Провести внеплановый инструктаж."; hasCrit = "Да"; }
-                        else if(c.finalC < 85) { reqAction = "Усилить операционный контроль за B2."; }
+                        // ГЕНЕРИРУЕМ ЭКСПЕРТНОЕ ЗАКЛЮЧЕНИЕ ДЛЯ PDF
+                        const expertData = getExpertConclusion(c, cName, tmplTitle, cCount, safeNameId);
 
                         reportBlocksHTML += `
-                            <div class="decision-box" style="border-left-color: ${c.isRedZone?'#ef4444':(c.finalC>=85?'#22c55e':'#f59e0b')};">
-                                <div style="font-size: 14px; font-weight: 900; margin-bottom: 8px;">РЕШЕНИЕ: ${c.statusTxt}</div>
-                                <table style="width:100%; font-size: 11px;">
-                                    <tr><td style="padding: 4px 0; width: 30%;"><b>Уровень качества:</b></td><td>${c.finalC}%</td></tr>
-                                    <tr><td style="padding: 4px 0;"><b>Критические дефекты (B3):</b></td><td>${hasCrit}</td></tr>
-                                    <tr><td style="padding: 4px 0;"><b>Причина:</b></td><td>${c.reason}</td></tr>
-                                    <tr><td style="padding: 4px 0;"><b>Что сделать:</b></td><td>${reqAction}</td></tr>
-                                </table>
-                            </div>
+                            ${expertData.pdfHtml}
                             <table class="metrics-table" style="margin-top: 15px;"><tr>
                                 <td><div class="metric-title">УрК Подрядчика</div><div class="metric-val text-xl">${c.finalC}%</div></td>
                                 <td><div class="metric-title">Статус риска</div><div class="metric-val" style="color: ${c.riskStatus === 'Высокий риск' ? '#dc2626' : (c.riskStatus === 'Средний риск' ? '#d97706' : '#16a34a')}">${c.riskStatus}</div></td>
@@ -4098,59 +4141,58 @@ if (isDemoMode) { showToast('⚠️ В демо-режиме сохранени�
             const body = document.getElementById('modal-body');
 
             if (cCount < 7) {
-                // ПОДСКАЗКА: текст предупреждения о недостатке проверок
-                body.innerHTML = `<p class="bg-yellow-50 text-yellow-800 p-4 rounded-xl border border-yellow-200 font-bold">Собрано по подрядчику (вид работ: ${document.getElementById('checklist-selector').options[document.getElementById('checklist-selector').selectedIndex].text}): <b>${cCount}</b> изд. Для расчета УрК Подрядчика требуется минимум <b>7</b>.</p>`;
+                body.innerHTML = `<p class="bg-yellow-50 text-yellow-800 p-4 rounded-xl border border-yellow-200 font-bold leading-snug">Собрано по подрядчику (вид работ: ${document.getElementById('checklist-selector').options[document.getElementById('checklist-selector').selectedIndex].text}): <br><b class="text-lg">${cCount}</b> изд. <br><br>Для расчета УрК Подрядчика требуется минимум <b>7</b>.</p>`;
             } else {
                 const c = getContractorMetrics(filteredArr);
                 body.innerHTML = `
-                    <div class="text-[11px] font-bold text-slate-400 uppercase mb-3">${document.getElementById('checklist-selector').options[document.getElementById('checklist-selector').selectedIndex].text}</div>
+                    <div class="text-[11px] font-bold text-slate-400 uppercase mb-3 leading-snug">${document.getElementById('checklist-selector').options[document.getElementById('checklist-selector').selectedIndex].text}</div>
                     
                     <div class="bg-indigo-50 p-4 rounded-xl border border-indigo-200 mb-5 shadow-sm">
                         <div class="text-[10px] uppercase font-bold text-indigo-500 mb-2">Формула УрК Подрядчика</div>
-                        <div class="text-sm font-black text-indigo-900 font-mono bg-white p-2 rounded border border-indigo-100 text-center shadow-inner">УрК = База × Ks × Kcrit</div>
-                        <div class="flex items-center justify-between mt-3 border-t border-indigo-100 pt-3">
+                        <div class="text-[11px] min-[380px]:text-sm font-black text-indigo-900 font-mono bg-white p-2 rounded border border-indigo-100 text-center shadow-inner break-words">УрК = База × Ks × Kcrit</div>
+                        <div class="flex flex-col min-[380px]:flex-row items-start min-[380px]:items-center justify-between mt-3 border-t border-indigo-100 pt-3 gap-2">
                             <div class="text-4xl font-black text-indigo-700 leading-none">${c.finalC}%</div>
-                            <div class="text-right">
-                                <span class="${c.confCls} block mb-1">${c.confStatus}</span>
-                                <span class="text-[10px] font-bold text-indigo-800 bg-indigo-100 px-2 py-1 rounded uppercase tracking-wider">${c.statusTxt}</span>
+                            <div class="text-left min-[380px]:text-right">
+                                <span class="${c.confCls} block mb-1 w-fit min-[380px]:ml-auto">${c.confStatus}</span>
+                                <span class="text-[10px] font-bold text-indigo-800 bg-indigo-100 px-2 py-1 rounded uppercase tracking-wider block w-fit min-[380px]:ml-auto">${c.statusTxt}</span>
                             </div>
                         </div>
                     </div>
                     
                     <div class="text-[11px] font-bold text-slate-400 uppercase mb-2">Разбор коэффициентов</div>
-                    <ul class="text-sm space-y-3 mb-5">
-                        <li class="flex justify-between items-center border-b border-slate-100 pb-2">
-                            <span><b>Базовый балл массива</b></span>
-                            <span class="font-black text-lg">${c.baseUrkContrPerc}%</span>
+                    <ul class="text-[13px] space-y-3 mb-5">
+                        <li class="flex flex-col min-[400px]:flex-row justify-between items-start min-[400px]:items-center border-b border-slate-100 pb-2 gap-1">
+                            <span class="w-full min-[400px]:w-auto"><b>Базовый балл массива</b></span>
+                            <span class="font-black text-lg self-end min-[400px]:self-auto bg-slate-100 px-2 py-0.5 rounded">${c.baseUrkContrPerc}%</span>
                         </li>
-                        <li class="flex justify-between items-center border-b border-slate-100 pb-2">
-                            <span><b>Системный брак (Ks)</b><br><span class="text-[10px] text-slate-500">Штраф за повтор одного дефекта (B2/B3) в ${c.maxFailRate.toFixed(1)}% случаев</span></span>
-                            <span class="font-black text-lg ${c.ks < 1 ? 'text-red-500' : 'text-green-600'}">${c.ks.toFixed(2)}</span>
+                        <li class="flex flex-col min-[400px]:flex-row justify-between items-start min-[400px]:items-center border-b border-slate-100 pb-2 gap-1">
+                            <span class="w-full min-[400px]:w-auto leading-snug"><b>Системный брак (Ks)</b><br><span class="text-[10px] text-slate-500 block mt-0.5">Повтор дефекта в ${c.maxFailRate.toFixed(1)}% случаев</span></span>
+                            <span class="font-black text-lg self-end min-[400px]:self-auto bg-slate-100 px-2 py-0.5 rounded ${c.ks < 1 ? 'text-red-500' : 'text-green-600'}">${c.ks.toFixed(2)}</span>
                         </li>
-                        <li class="flex justify-between items-center border-b border-slate-100 pb-2">
-                            <span><b>Критичность (Kcrit)</b><br><span class="text-[10px] text-slate-500">Штраф за наличие B3 в ${c.n_изделий_с_B3} изд. (Доля: ${c.rateB3.toFixed(1)}%)</span></span>
-                            <span class="font-black text-lg ${c.kcritC < 1 ? 'text-red-500' : 'text-green-600'}">${c.kcritC.toFixed(2)}</span>
+                        <li class="flex flex-col min-[400px]:flex-row justify-between items-start min-[400px]:items-center border-b border-slate-100 pb-2 gap-1">
+                            <span class="w-full min-[400px]:w-auto leading-snug"><b>Критичность (Kcrit)</b><br><span class="text-[10px] text-slate-500 block mt-0.5">B3 в ${c.n_изделий_с_B3} изд. (Доля: ${c.rateB3.toFixed(1)}%)</span></span>
+                            <span class="font-black text-lg self-end min-[400px]:self-auto bg-slate-100 px-2 py-0.5 rounded ${c.kcritC < 1 ? 'text-red-500' : 'text-green-600'}">${c.kcritC.toFixed(2)}</span>
                         </li>
                     </ul>
 
-                    <div class="grid grid-cols-2 gap-3 mb-4">
-                        <div class="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                    <div class="grid grid-cols-1 min-[380px]:grid-cols-2 gap-3 mb-4">
+                        <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 flex justify-between min-[380px]:block items-center">
                             <div class="text-[9px] uppercase font-bold text-slate-500">Волатильность (σ)</div>
                             <div class="text-lg font-black text-slate-800">${c.volatility.toFixed(1)}</div>
                         </div>
-                        <div class="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                        <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 flex justify-between min-[380px]:block items-center">
                             <div class="text-[9px] uppercase font-bold text-slate-500">Индекс стабильности</div>
-                            <div class="text-lg font-black text-slate-800">${c.stabilityIndex} / 100</div>
+                            <div class="text-lg font-black text-slate-800">${c.stabilityIndex} <span class="text-xs text-slate-400">/ 100</span></div>
                         </div>
                     </div>
 
-                    <div class="flex items-center justify-between bg-white border border-slate-200 p-3 rounded-xl shadow-sm mb-4">
-                        <span class="text-xs font-bold text-slate-600 uppercase">Статус риска:</span>
+                    <div class="flex flex-col min-[380px]:flex-row items-start min-[380px]:items-center justify-between bg-white border border-slate-200 p-3 rounded-xl shadow-sm mb-4 gap-1">
+                        <span class="text-[11px] font-bold text-slate-600 uppercase">Статус риска:</span>
                         <span class="${c.riskCls} text-sm">${c.riskStatus}</span>
                     </div>
 
                     <div class="text-[11px] font-bold text-red-700 mt-2 bg-red-50 p-3 rounded-xl border border-red-200 shadow-sm leading-snug">
-                        <span class="uppercase tracking-wider text-[9px] block mb-1">Основание (Триггер)</span>
+                        <span class="uppercase tracking-wider text-[9px] block mb-1 text-red-400">Основание (Триггер)</span>
                         ${c.reason}
                     </div>
                 `;
@@ -4557,6 +4599,324 @@ async function updateStorageDisplayInModal() {
         ` : ''}
     `;
 }
+// --- ГЕНЕРАТОР ЭКСПЕРТНОГО ЗАКЛЮЧЕНИЯ ---
+        function getExpertConclusion(c, contractorName, templateTitle, count, safeId) {
+            const isRed = c.finalC < 70 || c.rateB3 >= 30 || c.isRedZone;
+            const isYellow = c.finalC >= 70 && c.finalC < 85 && !isRed;
+            
+            const mainColor = isRed ? '#dc2626' : (isYellow ? '#d97706' : '#16a34a');
+            const bgColor = isRed ? '#fef2f2' : (isYellow ? '#fffbeb' : '#f0fdf4');
+            const borderColor = isRed ? '#fecaca' : (isYellow ? '#fde68a' : '#bbf7d0');
+            
+            const qualText = isRed ? 'НИЗКОЕ' : (isYellow ? 'ПРИЕМЛЕМОЕ' : 'ВЫСОКОЕ');
+            const emoji = isRed ? '🔴' : (isYellow ? '🟡' : '🟢');
+
+            let b3Text = c.n_изделий_с_B3 > 0 ? `🚨 КРИТИЧЕСКИЙ УРОВЕНЬ: ${c.n_изделий_с_B3} из ${count} изделий (${c.rateB3.toFixed(1)}%) содержат дефекты категории B3. Это недопустимо для приемки объекта.` : '';
+
+            let probsText = [];
+            if (c.maxFailRate >= 20) probsText.push(`• 🔄 ВЫЯВЛЕН СИСТЕМНЫЙ БРАК: дефект повторяется в ${c.maxFailRate.toFixed(1)}% случаев. Коэффициент системности Ks = ${c.ks.toFixed(2)}`);
+            if (c.volatility >= 10) probsText.push(`• 📉 НЕСТАБИЛЬНОСТЬ КАЧЕСТВА: волатильность ${c.volatility.toFixed(1)} пункта`);
+            if (probsText.length === 0) probsText.push(`• ✅ Значимых системных отклонений и скачков качества не выявлено.`);
+
+            let recomsText = [];
+            if (isRed || c.n_изделий_с_B3 > 0) {
+                recomsText.push("• НЕМЕДЛЕННО: Провести комиссионное обследование всех изделий с B3. Составить акт с фотофиксацией.");
+                recomsText.push("• Провести внеплановый инструктаж по устранению системной ошибки.");
+                recomsText.push("• Усилить входной контроль материалов.");
+            } else if (isYellow) {
+                recomsText.push("• Усилить операционный контроль.");
+                recomsText.push("• Обратить внимание на повторяющиеся дефекты B2.");
+            } else {
+                recomsText.push("• Продолжить работы в текущем режиме.");
+                recomsText.push("• Применять текущую практику подрядчика как эталонную.");
+            }
+
+            let verdictText = isRed ? "🔴 РЕКОМЕНДАЦИЯ: Работы ОСТАНОВЛЕНЫ. Требуется замена бригады/подрядчика.\\n\\nСТОП-РАБОТЫ до устранения критических нарушений!" :
+                              (isYellow ? "🟡 РЕКОМЕНДАЦИЯ: Взять на особый контроль. Приемка только после устранения B2." :
+                                          "🟢 РЕКОМЕНДАЦИЯ: Работы принимаются без ограничений.");
+
+            // Текст для кнопки "Копировать"
+            const plainText = `🧠 ЭКСПЕРТНОЕ ЗАКЛЮЧЕНИЕ\n\n${emoji} Качество работ подрядчика "${contractorName}" по виду "${templateTitle}" оценивается как ${qualText} (${c.finalC}%).\n\n` +
+            (b3Text ? `[КРИТИЧЕСКИЙ УРОВЕНЬ]\n${b3Text}\n\n` : '') +
+            `[Выявленные проблемы]\n${probsText.join('\n')}\n\n[Рекомендации]\n${recomsText.join('\n')}\n\n[Вердикт]\n${verdictText.replace(/<br>/g, '\n')}\n\nСгенерировано на основе ${count} проверок`;
+
+            // HTML для интерфейса PWA
+            const uiHtml = `
+                <div class="mt-6 border border-slate-300 bg-white rounded-xl shadow-sm overflow-hidden mb-6">
+                    <div class="bg-slate-100 border-b border-slate-200 p-3 flex justify-between items-center">
+                        <div class="font-black text-[11px] text-slate-700 uppercase tracking-widest flex items-center gap-2">🧠 Заключение ИИ</div>
+                        <button id="btn_copy_${safeId}" onclick="copyExpertText('btn_copy_${safeId}', 'text_expert_${safeId}')" class="text-[10px] font-bold bg-white border border-slate-300 text-slate-600 px-2 py-1 rounded shadow-sm active:scale-95 transition-all flex items-center gap-1 hover:bg-slate-50">📋 Копировать</button>
+                        <textarea id="text_expert_${safeId}" class="hidden">${plainText}</textarea>
+                    </div>
+                    <div class="p-3 min-[400px]:p-4">
+                        <div class="text-[12px] font-bold mb-4 leading-relaxed" style="color: ${mainColor};">${emoji} Качество работ подрядчика "${contractorName}" по виду "${templateTitle}" оценивается как ${qualText} (${c.finalC}%).</div>
+                        
+                        ${b3Text ? `<div class="border border-red-200 bg-red-50 p-3 rounded-lg mb-3 text-red-800 text-[11px] font-bold leading-snug shadow-sm">${b3Text}</div>` : ''}
+                        
+                        <div class="border border-slate-200 bg-slate-50 p-3 rounded-lg mb-3 shadow-sm">
+                            <div class="text-[10px] font-black text-slate-500 uppercase mb-2">🔍 Выявленные проблемы</div>
+                            <div class="text-[11px] text-slate-700 leading-snug space-y-1">${probsText.map(p => `<div>${p}</div>`).join('')}</div>
+                        </div>
+                        
+                        <div class="border border-sky-200 bg-sky-50 p-3 rounded-lg mb-3 shadow-sm">
+                            <div class="text-[10px] font-black text-sky-600 uppercase mb-2">🔧 Рекомендации</div>
+                            <div class="text-[11px] text-sky-800 leading-snug space-y-1">${recomsText.map(r => `<div>${r}</div>`).join('')}</div>
+                        </div>
+                        
+                        <div class="p-3 rounded-lg mb-2 shadow-sm" style="background: ${bgColor}; border: 1px solid ${borderColor};">
+                            <div class="text-[10px] font-black uppercase mb-2" style="color: ${mainColor};">🎯 Вердикт</div>
+                            <div class="text-[11px] font-bold leading-snug text-slate-800">${verdictText.replace(/\\n/g, '<br>')}</div>
+                        </div>
+                        
+                        <div class="text-right text-[9px] text-slate-400 font-bold uppercase mt-3">Сгенерировано на основе ${count} проверок</div>
+                    </div>
+                </div>
+            `;
+
+            // HTML для PDF отчета
+            const pdfHtml = `
+                <div style="margin-top: 20px; margin-bottom: 25px; border: 1px solid #cbd5e1; border-radius: 8px; background: #f8fafc; padding: 15px; page-break-inside: avoid;">
+                    <h3 style="margin-top: 0; font-size: 14px; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px; margin-bottom: 15px;">🧠 ЭКСПЕРТНОЕ ЗАКЛЮЧЕНИЕ ИИ</h3>
+                    <div style="font-size: 13px; font-weight: bold; margin-bottom: 15px; line-height: 1.4; color: ${mainColor};">${emoji} Качество работ подрядчика "${contractorName}" оценивается как ${qualText} (${c.finalC}%).</div>
+                    
+                    ${b3Text ? `<div style="border: 1px solid #fecaca; background: #fef2f2; color: #991b1b; padding: 10px; border-radius: 6px; font-size: 12px; font-weight: bold; margin-bottom: 10px;">${b3Text}</div>` : ''}
+                    
+                    <div style="border: 1px solid #e2e8f0; background: white; padding: 10px; border-radius: 6px; margin-bottom: 10px;">
+                        <div style="font-size: 11px; font-weight: bold; color: #64748b; text-transform: uppercase; margin-bottom: 5px;">🔍 Выявленные проблемы</div>
+                        <div style="font-size: 12px; line-height: 1.4; color: #334155;">${probsText.map(p => `<div>${p}</div>`).join('')}</div>
+                    </div>
+
+                    <div style="border: 1px solid #bae6fd; background: #f0f9ff; padding: 10px; border-radius: 6px; margin-bottom: 10px;">
+                        <div style="font-size: 11px; font-weight: bold; color: #0284c7; text-transform: uppercase; margin-bottom: 5px;">🔧 Рекомендации</div>
+                        <div style="font-size: 12px; line-height: 1.4; color: #075985;">${recomsText.map(r => `<div>${r}</div>`).join('')}</div>
+                    </div>
+
+                    <div style="border: 1px solid ${borderColor}; background: ${bgColor}; padding: 10px; border-radius: 6px;">
+                        <div style="font-size: 11px; font-weight: bold; color: ${mainColor}; text-transform: uppercase; margin-bottom: 5px;">🎯 Вердикт</div>
+                        <div style="font-size: 12px; font-weight: bold; line-height: 1.4; color: #1e293b;">${verdictText.replace(/\\n/g, '<br>')}</div>
+                    </div>
+                </div>
+            `;
+
+            return { uiHtml, pdfHtml };
+        }
+
+        // Функция копирования в буфер
+        function copyExpertText(btnId, textId) {
+            const text = document.getElementById(textId).value;
+            navigator.clipboard.writeText(text).then(() => {
+                const btn = document.getElementById(btnId);
+                const oldHtml = btn.innerHTML;
+                btn.innerHTML = "✅ Скопировано!";
+                btn.classList.add('bg-green-100', 'text-green-700', 'border-green-300');
+                setTimeout(() => {
+                    btn.innerHTML = oldHtml;
+                    btn.classList.remove('bg-green-100', 'text-green-700', 'border-green-300');
+                }, 2000);
+            });
+        }
+        // --- ГЕНЕРАТОР И РЕДАКТОР ЭКСПЕРТНОГО ЗАКЛЮЧЕНИЯ ---
+        let customExpertConclusions = {}; // Хранилище ручных правок инженера
+
+        function getExpertConclusion(c, contractorName, templateTitle, count, safeId) {
+            const expertKey = contractorName + "_||_" + templateTitle;
+            
+            const isRed = c.finalC < 70 || c.rateB3 >= 30 || c.isRedZone;
+            const isYellow = c.finalC >= 70 && c.finalC < 85 && !isRed;
+            
+            const mainColor = isRed ? '#dc2626' : (isYellow ? '#d97706' : '#16a34a');
+            const bgColor = isRed ? '#fef2f2' : (isYellow ? '#fffbeb' : '#f0fdf4');
+            const borderColor = isRed ? '#fecaca' : (isYellow ? '#fde68a' : '#bbf7d0');
+            
+            const qualText = isRed ? 'НИЗКОЕ' : (isYellow ? 'ПРИЕМЛЕМОЕ' : 'ВЫСОКОЕ');
+            const emoji = isRed ? '🔴' : (isYellow ? '🟡' : '🟢');
+
+            let b3Text = c.n_изделий_с_B3 > 0 ? `🚨 КРИТИЧЕСКИЙ УРОВЕНЬ: ${c.n_изделий_с_B3} из ${count} изделий (${c.rateB3.toFixed(1)}%) содержат дефекты категории B3. Это недопустимо для приемки объекта.` : '';
+
+            let probsText = [];
+            if (c.maxFailRate >= 20) probsText.push(`• 🔄 ВЫЯВЛЕН СИСТЕМНЫЙ БРАК: дефект повторяется в ${c.maxFailRate.toFixed(1)}% случаев. Коэффициент системности Ks = ${c.ks.toFixed(2)}`);
+            if (c.volatility >= 10) probsText.push(`• 📉 НЕСТАБИЛЬНОСТЬ КАЧЕСТВА: волатильность ${c.volatility.toFixed(1)} пункта`);
+            if (probsText.length === 0) probsText.push(`• ✅ Значимых системных отклонений и скачков качества не выявлено.`);
+
+            let recomsText = [];
+            if (isRed || c.n_изделий_с_B3 > 0) {
+                recomsText.push("• НЕМЕДЛЕННО: Провести комиссионное обследование всех изделий с B3. Составить акт с фотофиксацией.");
+                recomsText.push("• Провести внеплановый инструктаж по устранению системной ошибки.");
+                recomsText.push("• Усилить входной контроль материалов.");
+            } else if (isYellow) {
+                recomsText.push("• Усилить операционный контроль.");
+                recomsText.push("• Обратить внимание на повторяющиеся дефекты B2.");
+            } else {
+                recomsText.push("• Продолжить работы в текущем режиме.");
+                recomsText.push("• Применять текущую практику подрядчика как эталонную.");
+            }
+
+            let verdictText = isRed ? "🔴 РЕКОМЕНДАЦИЯ: Работы ОСТАНОВЛЕНЫ. Требуется замена бригады/подрядчика.\n\nСТОП-РАБОТЫ до устранения критических нарушений!" :
+                              (isYellow ? "🟡 РЕКОМЕНДАЦИЯ: Взять на особый контроль. Приемка только после устранения B2." :
+                                          "🟢 РЕКОМЕНДАЦИЯ: Работы принимаются без ограничений.");
+
+            // Стандартный текст от ИИ
+            let plainText = `🧠 ЭКСПЕРТНОЕ ЗАКЛЮЧЕНИЕ\n\n${emoji} Качество работ подрядчика "${contractorName}" по виду "${templateTitle}" оценивается как ${qualText} (${c.finalC}%).\n\n` +
+            (b3Text ? `[КРИТИЧЕСКИЙ УРОВЕНЬ]\n${b3Text}\n\n` : '') +
+            `[Выявленные проблемы]\n${probsText.join('\n')}\n\n[Рекомендации]\n${recomsText.join('\n')}\n\n[Вердикт]\n${verdictText}\n\nСгенерировано на основе ${count} проверок`;
+
+            let isCustom = false;
+            if (customExpertConclusions[expertKey]) {
+                plainText = customExpertConclusions[expertKey];
+                isCustom = true;
+            }
+
+            let contentUiHtml = '';
+            let pdfHtml = '';
+
+            if (isCustom) {
+                // Если текст редактировал Инженер
+                let safeText = plainText.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+                let uiText = safeText.replace(/^\[(.*?)\]/gm, '<div class="text-[11px] font-black text-indigo-700 uppercase mt-4 mb-1">$1</div>');
+                let pdfFormattedText = safeText.replace(/^\[(.*?)\]/gm, '<div style="font-size: 11px; font-weight: bold; color: #854d0e; text-transform: uppercase; margin-top: 10px; margin-bottom: 4px;">$1</div>');
+                
+                contentUiHtml = `
+                    <div class="p-3 min-[400px]:p-4 bg-yellow-50">
+                        <div class="text-[9px] font-bold text-yellow-700 uppercase mb-2 flex items-center gap-1 bg-yellow-100 w-fit px-2 py-1 rounded"><span>⚠️</span> Текст скорректирован инженером</div>
+                        <div class="text-[11px] text-slate-800 whitespace-pre-wrap leading-relaxed">${uiText}</div>
+                    </div>`;
+                
+                pdfHtml = `
+                    <div style="margin-top: 20px; margin-bottom: 25px; border: 1px solid #fde047; border-radius: 8px; background: #fefce8; padding: 15px; page-break-inside: avoid;">
+                        <h3 style="margin-top: 0; font-size: 14px; border-bottom: 2px solid #fef08a; padding-bottom: 8px; margin-bottom: 15px; color: #854d0e;">⚠️ ЭКСПЕРТНОЕ ЗАКЛЮЧЕНИЕ (С КОРРЕКТИРОВКАМИ ИНЖЕНЕРА)</h3>
+                        <div style="font-size: 12px; line-height: 1.5; color: #1e293b; white-space: pre-wrap;">${pdfFormattedText}</div>
+                    </div>`;
+            } else {
+                // Стандартные красивые блоки ИИ
+                contentUiHtml = `
+                    <div class="p-3 min-[400px]:p-4">
+                        <div class="text-[12px] font-bold mb-4 leading-relaxed" style="color: ${mainColor};">${emoji} Качество работ подрядчика "${contractorName}" по виду "${templateTitle}" оценивается как ${qualText} (${c.finalC}%).</div>
+                        ${b3Text ? `<div class="border border-red-200 bg-red-50 p-3 rounded-lg mb-3 text-red-800 text-[11px] font-bold leading-snug shadow-sm">${b3Text}</div>` : ''}
+                        <div class="border border-slate-200 bg-slate-50 p-3 rounded-lg mb-3 shadow-sm">
+                            <div class="text-[10px] font-black text-slate-500 uppercase mb-2">🔍 Выявленные проблемы</div>
+                            <div class="text-[11px] text-slate-700 leading-snug space-y-1">${probsText.map(p => `<div>${p}</div>`).join('')}</div>
+                        </div>
+                        <div class="border border-sky-200 bg-sky-50 p-3 rounded-lg mb-3 shadow-sm">
+                            <div class="text-[10px] font-black text-sky-600 uppercase mb-2">🔧 Рекомендации</div>
+                            <div class="text-[11px] text-sky-800 leading-snug space-y-1">${recomsText.map(r => `<div>${r}</div>`).join('')}</div>
+                        </div>
+                        <div class="p-3 rounded-lg mb-2 shadow-sm" style="background: ${bgColor}; border: 1px solid ${borderColor};">
+                            <div class="text-[10px] font-black uppercase mb-2" style="color: ${mainColor};">🎯 Вердикт</div>
+                            <div class="text-[11px] font-bold leading-snug text-slate-800">${verdictText.replace(/\n/g, '<br>')}</div>
+                        </div>
+                        <div class="text-right text-[9px] text-slate-400 font-bold uppercase mt-3">Сгенерировано на основе ${count} проверок</div>
+                    </div>`;
+                
+                pdfHtml = `
+                    <div style="margin-top: 20px; margin-bottom: 25px; border: 1px solid #cbd5e1; border-radius: 8px; background: #f8fafc; padding: 15px; page-break-inside: avoid;">
+                        <h3 style="margin-top: 0; font-size: 14px; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px; margin-bottom: 15px;">🧠 ЭКСПЕРТНОЕ ЗАКЛЮЧЕНИЕ ИИ</h3>
+                        <div style="font-size: 13px; font-weight: bold; margin-bottom: 15px; line-height: 1.4; color: ${mainColor};">${emoji} Качество работ подрядчика "${contractorName}" оценивается как ${qualText} (${c.finalC}%).</div>
+                        ${b3Text ? `<div style="border: 1px solid #fecaca; background: #fef2f2; color: #991b1b; padding: 10px; border-radius: 6px; font-size: 12px; font-weight: bold; margin-bottom: 10px;">${b3Text}</div>` : ''}
+                        <div style="border: 1px solid #e2e8f0; background: white; padding: 10px; border-radius: 6px; margin-bottom: 10px;">
+                            <div style="font-size: 11px; font-weight: bold; color: #64748b; text-transform: uppercase; margin-bottom: 5px;">🔍 Выявленные проблемы</div>
+                            <div style="font-size: 12px; line-height: 1.4; color: #334155;">${probsText.map(p => `<div>${p}</div>`).join('')}</div>
+                        </div>
+                        <div style="border: 1px solid #bae6fd; background: #f0f9ff; padding: 10px; border-radius: 6px; margin-bottom: 10px;">
+                            <div style="font-size: 11px; font-weight: bold; color: #0284c7; text-transform: uppercase; margin-bottom: 5px;">🔧 Рекомендации</div>
+                            <div style="font-size: 12px; line-height: 1.4; color: #075985;">${recomsText.map(r => `<div>${r}</div>`).join('')}</div>
+                        </div>
+                        <div style="border: 1px solid ${borderColor}; background: ${bgColor}; padding: 10px; border-radius: 6px;">
+                            <div style="font-size: 11px; font-weight: bold; color: ${mainColor}; text-transform: uppercase; margin-bottom: 5px;">🎯 Вердикт</div>
+                            <div style="font-size: 12px; font-weight: bold; line-height: 1.4; color: #1e293b;">${verdictText.replace(/\n/g, '<br>')}</div>
+                        </div>
+                    </div>`;
+            }
+
+            const uiHtml = `
+                <div class="mt-6 border border-slate-300 bg-white rounded-xl shadow-sm overflow-hidden mb-6">
+                    <div class="bg-slate-100 border-b border-slate-200 p-2 flex justify-between items-center gap-2">
+                        <div class="font-black text-[10px] min-[400px]:text-[11px] text-slate-700 uppercase tracking-widest flex items-center gap-1 min-w-0 truncate ml-1">🧠 Заключение</div>
+                        <div class="flex gap-1 shrink-0">
+                            <button onclick="editExpertText('${expertKey}', 'text_expert_${safeId}')" class="text-[10px] font-bold bg-white border border-slate-300 text-slate-600 px-2 py-1.5 rounded shadow-sm active:scale-95 transition-all hover:bg-slate-50 flex items-center justify-center gap-1">
+                                ✏️<span class="hidden min-[400px]:inline"> Редак.</span>
+                            </button>
+                            <button id="btn_copy_${safeId}" onclick="copyExpertText('btn_copy_${safeId}', 'text_expert_${safeId}')" class="text-[10px] font-bold bg-indigo-50 border border-indigo-200 text-indigo-700 px-2 py-1.5 rounded shadow-sm active:scale-95 transition-all hover:bg-indigo-100 flex items-center justify-center gap-1">
+                                📋<span class="hidden min-[400px]:inline"> Копия</span>
+                            </button>
+                        </div>
+                        <textarea id="text_expert_${safeId}" class="hidden">${plainText}</textarea>
+                    </div>
+                    ${contentUiHtml}
+                </div>
+            `;
+
+            return { uiHtml, pdfHtml };
+        }
+
+        // Управление редактором Заключения
+        let currentExpertKey = null;
+
+        function editExpertText(expertKey, textareaId) {
+            currentExpertKey = expertKey;
+            const currentText = document.getElementById(textareaId).value;
+            
+            const modal = document.getElementById('expert-modal-overlay');
+            const content = document.getElementById('expert-modal-content');
+            const input = document.getElementById('modal-expert-input');
+
+            input.value = currentText;
+
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            document.body.classList.add('modal-open');
+            
+            setTimeout(() => { content.classList.remove('translate-y-full'); }, 50);
+        }
+
+        function cancelExpertEdit() {
+            const modal = document.getElementById('expert-modal-overlay');
+            const content = document.getElementById('expert-modal-content');
+            
+            content.classList.add('translate-y-full');
+            document.getElementById('modal-expert-input').blur();
+            
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+                document.body.classList.remove('modal-open');
+                currentExpertKey = null;
+            }, 300);
+        }
+
+        function saveExpertEdit() {
+            if (!currentExpertKey) return;
+            const inputVal = document.getElementById('modal-expert-input').value.trim();
+            customExpertConclusions[currentExpertKey] = inputVal; // Сохраняем правки инженера
+            
+            cancelExpertEdit();
+            setTimeout(() => { renderAnalyticsTab(); }, 300); // Перерисовываем аналитику
+        }
+
+        function resetExpertEdit() {
+            if (!currentExpertKey) return;
+            if(confirm('Удалить ваши правки и вернуть исходный текст, сгенерированный ИИ?')) {
+                delete customExpertConclusions[currentExpertKey]; // Удаляем правки инженера
+                cancelExpertEdit();
+                setTimeout(() => { renderAnalyticsTab(); }, 300);
+            }
+        }
+
+        // Кнопка копирования
+        function copyExpertText(btnId, textId) {
+            const text = document.getElementById(textId).value;
+            navigator.clipboard.writeText(text).then(() => {
+                const btn = document.getElementById(btnId);
+                const oldHtml = btn.innerHTML;
+                btn.innerHTML = "✅<span class='hidden min-[400px]:inline'> Скопировано</span>";
+                btn.classList.remove('bg-indigo-50', 'border-indigo-200', 'text-indigo-700');
+                btn.classList.add('bg-green-100', 'text-green-700', 'border-green-300');
+                setTimeout(() => {
+                    btn.innerHTML = oldHtml;
+                    btn.classList.add('bg-indigo-50', 'border-indigo-200', 'text-indigo-700');
+                    btn.classList.remove('bg-green-100', 'text-green-700', 'border-green-300');
+                }, 2000);
+            });
+        }
 </script>
 </body>
 </html>
