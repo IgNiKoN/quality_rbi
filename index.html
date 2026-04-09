@@ -259,6 +259,20 @@
 
     <!-- Контейнер для Тостов (Change 3) -->
     <div id="toast-container"></div>
+    <!-- НОВОЕ Окно для ввода комментария -->
+    <div id="comment-modal-overlay" class="fixed inset-0 bg-slate-900/70 z-[150] hidden items-end min-[640px]:items-center justify-center p-0 min-[640px]:p-4 backdrop-blur-sm transition-opacity" onclick="cancelComment()">
+        <div class="bg-white w-full max-w-md p-5 rounded-t-2xl min-[640px]:rounded-2xl shadow-2xl transition-transform transform translate-y-full duration-300" id="comment-modal-content" onclick="event.stopPropagation()">
+            <div class="flex justify-between items-center mb-4 border-b border-slate-100 pb-3">
+                <h3 class="font-black text-slate-800 text-[13px] uppercase tracking-tight">📝 Комментарий к дефекту</h3>
+                <div class="w-8 h-8 bg-slate-100 rounded-full flex items-center justify-center text-slate-500 font-bold cursor-pointer hover:bg-slate-200 active:scale-95" onclick="cancelComment()">✕</div>
+            </div>
+            <textarea id="modal-comment-input" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-[13px] text-slate-700 outline-none focus:border-indigo-500 transition-all resize-none h-28 shadow-inner" placeholder="Опишите дефект подробнее..."></textarea>
+            <div class="flex gap-2 mt-4">
+                <button onclick="deleteCommentFromModal()" id="btn-delete-comment" class="bg-red-50 text-red-600 border border-red-200 px-4 py-3 rounded-xl font-bold text-[11px] uppercase tracking-wider active:scale-95 hidden">Удалить</button>
+                <button onclick="saveCommentFromModal()" class="flex-1 bg-indigo-600 text-white px-4 py-3 rounded-xl font-bold text-[11px] uppercase tracking-wider active:scale-95 shadow-md">Сохранить</button>
+            </div>
+        </div>
+    </div>
 
    <!-- Фиксированная шапка -->
     <header class="header-fixed" id="main-header">
@@ -2453,53 +2467,99 @@ const SYSTEM_TEMPLATES = {
             let y = window.scrollY; render(); window.scrollTo(0, y); updateUI(); saveSessionData();
         }
 
+        let currentCommentId = null;
+        let savedScrollY = 0; // Переменная для железного сохранения позиции скролла
+
         function toggleCommentField(id) {
+            currentCommentId = id;
+            savedScrollY = window.scrollY; // ЗАПОМИНАЕМ скролл ДО открытия модалки
+
+            const modal = document.getElementById('comment-modal-overlay');
+            const content = document.getElementById('comment-modal-content');
+            const input = document.getElementById('modal-comment-input');
+            const deleteBtn = document.getElementById('btn-delete-comment');
+
+            // Заполняем текущим текстом
             details[id] = details[id] || {};
-            details[id].showComment = !details[id].showComment;
-            
-            render();
-            
-            // Плавно центрируем карточку на экране
-            const card = document.getElementById('item_' + id);
-            if (card) {
-                card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            input.value = details[id].comment || '';
+
+            // Показываем/скрываем кнопку удаления
+            if (details[id].comment && details[id].comment.trim() !== '') {
+                deleteBtn.classList.remove('hidden');
+            } else {
+                deleteBtn.classList.add('hidden');
             }
+
+            // Показываем модалку (ВНИМАНИЕ: мы больше не используем modal-open)
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
             
-            if(details[id].showComment) {
-                setTimeout(() => { const el = document.getElementById(`comment_${id}`); if(el) el.focus(); }, 100);
-            }
+            // Даем небольшую задержку для плавной анимации
+            setTimeout(() => {
+                content.classList.remove('translate-y-full');
+                input.focus(); // Вызываем клавиатуру
+            }, 50);
         }
 
-        function closeCommentField(id) {
+        function cancelComment() {
+            const modal = document.getElementById('comment-modal-overlay');
+            const content = document.getElementById('comment-modal-content');
+            
+            content.classList.add('translate-y-full'); // Убираем модалку вниз
+            document.getElementById('modal-comment-input').blur(); // Прячем клавиатуру
+            
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+                currentCommentId = null;
+                // При простой отмене тоже возвращаем скролл на место
+                window.scrollTo(0, savedScrollY);
+            }, 300); // Ждем окончания анимации
+        }
+
+        function saveCommentFromModal() {
+            if (!currentCommentId) return;
+            const id = currentCommentId;
+            const inputVal = document.getElementById('modal-comment-input').value.trim();
+            
             details[id] = details[id] || {};
-            const inputEl = document.getElementById(`comment_${id}`);
-            if (inputEl) {
-                details[id].comment = inputEl.value.trim();
-                inputEl.blur(); // Принудительно скрываем клавиатуру телефона
-            }
-            details[id].showComment = false;
+            details[id].comment = inputVal;
             
-            render();
-            
-            // После закрытия поля плавно возвращаем карточку в центр экрана
-            const card = document.getElementById('item_' + id);
-            if (card) {
-                card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-            }
+            cancelComment(); // Закрываем модалку
             saveSessionData();
+            
+            // Рендерим с задержкой и ЖЕСТКО возвращаем скролл на сохраненную позицию
+            setTimeout(() => {
+                render(); 
+                window.scrollTo(0, savedScrollY);
+            }, 300);
+        }
+
+        function deleteCommentFromModal() {
+            if (!currentCommentId) return;
+            if(!confirm('Удалить комментарий?')) return;
+            
+            const id = currentCommentId;
+            if(details[id]) { details[id].comment = ""; }
+            
+            cancelComment();
+            saveSessionData();
+            
+            setTimeout(() => {
+                render(); 
+                window.scrollTo(0, savedScrollY);
+            }, 300);
         }
 
         function deleteComment(id, event) {
+            // Это удаление с самой карточки (по крестику)
             if(event) event.stopPropagation();
             if(!confirm('Удалить комментарий?')) return;
-            if(details[id]) { details[id].comment = ""; details[id].showComment = false; }
+            if(details[id]) { details[id].comment = ""; }
             
+            let y = window.scrollY; 
             render(); 
-            
-            const card = document.getElementById('item_' + id);
-            if (card) {
-                card.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }
+            window.scrollTo(0, y);
             saveSessionData();
         }
 
@@ -2580,16 +2640,9 @@ const SYSTEM_TEMPLATES = {
 
                         extraBtnsHtml = `<div class="flex gap-1.5 shrink-0 ml-2 items-center justify-end">${commBtn}${photoBtn}${escBtn}</div>`;
 
-                        // Блок ввода комментария (открывается плавно, УВЕЛИЧЕН шрифт)
-                        if (details[i.id]?.showComment) {
-                            commentBlockHtml = `
-                            <div class="mt-2 pt-2 border-t border-red-100 flex gap-2 items-center">
-                                <input type="text" id="comment_${i.id}" class="input-base !py-2 !px-3 !text-[13px] flex-1" placeholder="Введите текст комментария..." value="${details[i.id]?.comment || ''}">
-                                <button onclick="closeCommentField(${i.id})" class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-[11px] font-bold uppercase shrink-0 hover:bg-indigo-700 active:scale-95 transition-all shadow-md">Сохранить</button>
-                            </div>`;
-                        } else if (hasComment) {
-                            // Если скрыт, но текст есть, показываем текст снизу
-                            commentBlockHtml = `<div class="mt-2 text-[12px] font-semibold text-slate-700 italic bg-white bg-opacity-70 p-2 rounded-md border border-red-100">💬 ${details[i.id].comment}</div>`;
+                        // Показываем текст комментария снизу карточки
+                        if (hasComment) {
+                            commentBlockHtml = `<div class="mt-2 text-[12px] font-semibold text-slate-700 italic bg-white bg-opacity-70 p-2 rounded-md border border-red-100 leading-snug">💬 ${details[i.id].comment}</div>`;
                         }
 
                         if (isEscalated) {
